@@ -16,8 +16,8 @@ app.post("/debug/chat", async (c) => {
     "claude-haiku-4-5",
   );
   const agent = createAgent(model);
-  const reply = await agent.run(message);
-  return c.json({ reply });
+  const replies = await agent.run(message);
+  return c.json({ replies });
 });
 
 export default app;
