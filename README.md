@@ -1,19 +1,40 @@
 ```txt
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 ```txt
-npm run deploy
+pnpm deploy
 ```
 
-[For generating/synchronizing types based on your Worker configuration run](https://developers.cloudflare.com/workers/wrangler/commands/#types):
+## Secrets and env vars
+
+Local dev reads secrets from `.dev.vars` in the repo root (gitignored).
+Copy the template and fill in the values:
 
 ```txt
-npm run cf-typegen
+cp .dev.vars.example .dev.vars
 ```
 
-Pass the `CloudflareBindings` as generics when instantiating `Hono`:
+For production, set secrets via wrangler:
+
+```txt
+pnpm wrangler secret put ANTHROPIC_API_KEY
+```
+
+## Cloudflare bindings types
+
+`worker-configuration.d.ts` is generated from `wrangler.jsonc` + `.dev.vars`.
+`pnpm dev` runs `wrangler types` first via the `predev` hook, so types stay in
+sync when you add a binding or `.dev.vars` key and restart dev.
+
+To regenerate manually:
+
+```txt
+pnpm cf-typegen
+```
+
+Pass `CloudflareBindings` as generics when instantiating `Hono`:
 
 ```ts
 // src/index.ts
