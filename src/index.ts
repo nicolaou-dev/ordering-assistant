@@ -57,9 +57,20 @@ app.post("/webhook/whatsapp", async (c) => {
   if (inbound.success) {
     const { from, id, text } = inbound.data;
     c.executionCtx.waitUntil(
-      Promise.resolve().then(() =>
-        console.log("inbound", { from, id, text: text?.body }),
-      ),
+      Promise.resolve().then(async () => {
+        const result = await c.env.DB.prepare(
+          "INSERT OR IGNORE INTO inbound_messages(message_id, received_at) VALUES (?, ?)",
+        )
+          .bind(id, Date.now())
+          .run();
+
+        if (result.meta.changes === 0) {
+          console.log("deduped", { id });
+          return;
+        }
+
+        console.log("inbound", { from, id, text: text?.body });
+      }),
     );
   }
 

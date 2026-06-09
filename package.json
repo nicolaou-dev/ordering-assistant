@@ -1,22 +1,24 @@
 {
-	"name": "loop",
-	"type": "module",
-	"scripts": {
-		"predev": "pnpm cf-typegen",
-		"dev": "wrangler dev",
-		"deploy": "wrangler deploy --minify",
-		"typecheck": "tsc --noEmit",
-		"cf-typegen": "wrangler types --env-interface CloudflareBindings"
-	},
-	"dependencies": {
-		"@ai-sdk/anthropic": "^3.0.81",
-		"ai": "^6.0.197",
-		"hono": "^4.12.24",
-		"zod": "^4.4.3"
-	},
-	"devDependencies": {
-		"@types/node": "^25.9.2",
-		"typescript": "^6.0.3",
-		"wrangler": "^4.98.0"
-	}
+  "name": "loop",
+  "type": "module",
+  "scripts": {
+    "predev": "pnpm cf-typegen",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy --minify",
+    "db:migrate": "wrangler d1 migrations apply loop",
+    "typecheck": "tsc --noEmit",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.81",
+    "ai": "^6.0.197",
+    "hono": "^4.12.24",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.2",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.98.0"
+  }
 }
+
