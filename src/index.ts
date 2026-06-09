@@ -4,6 +4,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createAgent } from "./agent";
 import { verifySignature } from "./verify";
 import z from "zod";
+import { createClient } from "./whatsapp/client";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -86,6 +87,19 @@ app.post("/debug/chat", async (c) => {
   const agent = createAgent(model);
   const replies = await agent.run(message);
   return c.json({ replies });
+});
+
+app.post("/debug/send", async (c) => {
+  const { to, body } = await c.req.json<{ to: string; body: string }>();
+  const settings = getSettings(c.env);
+  const client = createClient(settings);
+
+  try {
+    await client.send(to, body);
+    return c.body(null, 204);
+  } catch (e) {
+    return c.json({ error: (e as Error).message }, 502);
+  }
 });
 
 export default app;
