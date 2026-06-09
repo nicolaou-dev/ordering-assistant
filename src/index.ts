@@ -38,11 +38,11 @@ const Inbound = z.object({
 
 app.post("/webhook/whatsapp", async (c) => {
   const settings = getSettings(c.env);
-  const text = await c.req.text();
+  const rawBody = await c.req.text();
   const header = c.req.header("x-hub-signature-256");
 
   const valid = await verifySignature(
-    text,
+    rawBody,
     settings.WHATSAPP_APP_SECRET,
     header,
   );
@@ -51,29 +51,46 @@ app.post("/webhook/whatsapp", async (c) => {
     return c.body(null, 401);
   }
 
-  const body = JSON.parse(text);
+  const body = JSON.parse(rawBody);
   const msg = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
   const inbound = Inbound.safeParse(msg);
 
-  if (inbound.success) {
-    const { from, id, text } = inbound.data;
-    c.executionCtx.waitUntil(
-      Promise.resolve().then(async () => {
-        const result = await c.env.DB.prepare(
-          "INSERT OR IGNORE INTO inbound_messages(message_id, received_at) VALUES (?, ?)",
-        )
-          .bind(id, Date.now())
-          .run();
-
-        if (result.meta.changes === 0) {
-          console.log("deduped", { id });
-          return;
-        }
-
-        console.log("inbound", { from, id, text: text?.body });
-      }),
-    );
+  if (!inbound.success) {
+    return c.body(null, 200);
   }
+
+  const { from, id, text } = inbound.data;
+
+  const handleInbound = async () => {
+    const result = await c.env.DB.prepare(
+      "INSERT OR IGNORE INTO inbound_messages(message_id, received_at) VALUES (?, ?)",
+    )
+      .bind(id, Date.now())
+      .run();
+
+    if (result.meta.changes === 0) {
+      console.log("deduped", { id });
+      return;
+    }
+
+    console.log("inbound", { from, id, text: text?.body });
+
+    if (!text?.body) return;
+
+    const model = createAnthropic({ apiKey: settings.ANTHROPIC_API_KEY })(
+      "claude-haiku-4-5",
+    );
+    const agent = createAgent(model);
+    const client = createClient(settings);
+    const replies = await agent.run(text.body);
+    for (const reply of replies) {
+      if (reply.type === "text") {
+        await client.send(from, reply.body);
+      }
+    }
+  };
+
+  c.executionCtx.waitUntil(handleInbound());
 
   return c.body(null, 200);
 });
