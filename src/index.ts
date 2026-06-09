@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { getSettings } from "./settings";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createAgent } from "./agent";
+import { verifySignature } from "./verify";
 import z from "zod";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
@@ -35,7 +36,21 @@ const Inbound = z.object({
 });
 
 app.post("/webhook/whatsapp", async (c) => {
-  const body = await c.req.json().catch(() => null);
+  const settings = getSettings(c.env);
+  const text = await c.req.text();
+  const header = c.req.header("x-hub-signature-256");
+
+  const valid = await verifySignature(
+    text,
+    settings.WHATSAPP_APP_SECRET,
+    header,
+  );
+
+  if (!valid) {
+    return c.body(null, 401);
+  }
+
+  const body = JSON.parse(text);
   const msg = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
   const inbound = Inbound.safeParse(msg);
 
