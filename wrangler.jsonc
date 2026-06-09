@@ -18,6 +18,14 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
+  "durable_objects": {
+    "bindings": [
+      { "name": "OrderAgent", "class_name": "OrderAgent" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["OrderAgent"] }
+  ],
 	"d1_databases": [
 		{
 			"binding": "DB",

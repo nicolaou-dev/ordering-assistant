@@ -1,10 +1,12 @@
 import { Hono } from "hono";
 import { getSettings } from "./settings";
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { createAgent } from "./agent";
+import { OrderAgent } from "./agent";
 import { verifySignature } from "./verify";
 import z from "zod";
 import { createClient } from "./whatsapp/client";
+import { getAgentByName } from "agents";
+
+export { OrderAgent };
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -77,12 +79,11 @@ app.post("/webhook/whatsapp", async (c) => {
 
     if (!text?.body) return;
 
-    const model = createAnthropic({ apiKey: settings.ANTHROPIC_API_KEY })(
-      "claude-haiku-4-5",
-    );
-    const agent = createAgent(model);
+    const stub = await getAgentByName(c.env.OrderAgent, from);
+    const replies = await stub.runTurn(text.body);
+
     const client = createClient(settings);
-    const replies = await agent.run(text.body);
+
     for (const reply of replies) {
       if (reply.type === "text") {
         await client.send(from, reply.body);
@@ -96,13 +97,12 @@ app.post("/webhook/whatsapp", async (c) => {
 });
 
 app.post("/debug/chat", async (c) => {
-  const { message } = await c.req.json<{ message: string }>();
-  const settings = getSettings(c.env);
-  const model = createAnthropic({ apiKey: settings.ANTHROPIC_API_KEY })(
-    "claude-haiku-4-5",
-  );
-  const agent = createAgent(model);
-  const replies = await agent.run(message);
+  const { message, instance } = await c.req.json<{
+    message: string;
+    instance: string;
+  }>();
+  const stub = await getAgentByName(c.env.OrderAgent, instance);
+  const replies = await stub.runTurn(message);
   return c.json({ replies });
 });
 
