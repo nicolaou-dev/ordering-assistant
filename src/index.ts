@@ -88,10 +88,14 @@ app.post("/webhook/whatsapp", async (c) => {
 
     if (!text?.body) return;
 
+    const client = createClient(settings);
+
+    client.markReadTyping(id).catch((e) => {
+      console.error("markReadTyping failed", { id, error: (e as Error).message });
+    });
+
     const stub = await getAgentByName(c.env.OrderAgent, sessionKey);
     const replies = await stub.runTurn(text.body);
-
-    const client = createClient(settings);
 
     for (const reply of replies) {
       if (reply.type === "text") {
