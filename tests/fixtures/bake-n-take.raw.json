@@ -1,0 +1,1832 @@
+{
+  "source": "https://wolt.com/en/cyp/nicosia/restaurant/bake-n-take",
+  "fetched_at": "2026-06-10",
+  "note": "Scraped from page query-state. Prices are integer minor units (EUR). Currency intentionally omitted.",
+  "venue": {
+    "name": "Bake 'N' Take",
+    "address": "Kalavriton 63G",
+    "phone": "+35722251261",
+    "timezone": "Asia/Nicosia",
+    "rating": 4,
+    "order_minimum": null,
+    "delivery_base_price": 125
+  },
+  "items": [
+    {
+      "category": "PIES",
+      "name": "Lahmajoun",
+      "description": "Fresh minced beef and lamb meat with B'N'T herbs and spices. Served with fresh lemon",
+      "price": 250,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/4a0d4c0c-5c50-11ed-abd9-526e4a45600b_laxmatzoun.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 6,
+          "values": [
+            {
+              "name": "cheese",
+              "price": 150
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            },
+            {
+              "name": "lettuce",
+              "price": 70
+            },
+            {
+              "name": "haloumi",
+              "price": 150
+            },
+            {
+              "name": "feta",
+              "price": 150
+            },
+            {
+              "name": "tahini",
+              "price": 100
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "PIES",
+      "name": "Spicy Chicken Pie 🌶️",
+      "description": "Shredded juicy chicken with a unique hot and spicy B'N'T sauce",
+      "price": 450,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/0f5ed788-5c50-11ed-95e8-76fbffa360ba_spicy_chicken_pie.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 9,
+          "values": [
+            {
+              "name": "cheese",
+              "price": 150
+            },
+            {
+              "name": "halloumi",
+              "price": 150
+            },
+            {
+              "name": "feta",
+              "price": 150
+            },
+            {
+              "name": "ham",
+              "price": 100
+            },
+            {
+              "name": "pepperoni",
+              "price": 100
+            },
+            {
+              "name": "sweet corn",
+              "price": 70
+            },
+            {
+              "name": " tomato",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "green peppers ",
+              "price": 70
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "PIES",
+      "name": "Pastourma Pie 🌶️",
+      "description": "Armenian dried spicy beef sausage",
+      "price": 400,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/db6f4cd2-5c4f-11ed-a121-76fbffa360ba_pastourmadopita.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 3,
+          "values": [
+            {
+              "name": "cheese",
+              "price": 150
+            },
+            {
+              "name": "haloumi",
+              "price": 150
+            },
+            {
+              "name": "feta",
+              "price": 150
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "PIES",
+      "name": "Chicken Pie",
+      "description": "Shredded chicken breast and bacon, cooked in white sauce and blue cheese",
+      "price": 350,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/c356c134-5c4f-11ed-a533-0a39143d3213_kotopita.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "PIES",
+      "name": "Minced Beef Pie",
+      "description": "Minced beef, onion, parsley, light spices",
+      "price": 400,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/30463aea-5c50-11ed-9be2-02e8517f3b64_kimadopita.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "PIES",
+      "name": "Bake N Take Chicken Pie",
+      "description": "Chicken pieces cooked with mushrooms and fresh cream",
+      "price": 430,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/a417dc4a-5c4f-11ed-bd47-06b060be90e0_bake_n_take_chicken.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "PIES",
+      "name": "Chicken Kebab Pie",
+      "description": "Marinated chicken kebab on charcoal with garlic sauce and potato",
+      "price": 430,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/c971a750-5c4f-11ed-8d55-f6d539c549f0_kotopoulo_souvlaki.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "PIES",
+      "name": "Shish Kebab",
+      "description": "Armenian lamb and beef minced kebab on charcoal, with onion, parsley and sumac",
+      "price": 430,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/9d411ca6-5c4f-11ed-bea6-f2851e2e4222_armeniko_shish_kebab.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 2,
+          "values": [
+            {
+              "name": "tahini",
+              "price": 100
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "PIES",
+      "name": "Halloumi Pie",
+      "description": "Stuffed with Cypriot halloumi cheese",
+      "price": 250,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/ab1f3b6e-5c4f-11ed-a314-8ad41b3d9a80_chaloumopita.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 2,
+          "values": [
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "PIES",
+      "name": "Spicy Halloumi Pie 🌶️",
+      "description": "Cyprus halloumi cheese, cheddar, red chili paste, herbs and spices",
+      "price": 480,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/82624776-0ccb-11ed-a5d8-0e18e43db777_020_spicy_halloumi.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 11,
+          "values": [
+            {
+              "name": "chicken",
+              "price": 150
+            },
+            {
+              "name": "cheese",
+              "price": 150
+            },
+            {
+              "name": "halloumi",
+              "price": 150
+            },
+            {
+              "name": "feta",
+              "price": 150
+            },
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "sweet corn",
+              "price": 70
+            },
+            {
+              "name": "green pepper",
+              "price": 70
+            },
+            {
+              "name": "ham",
+              "price": 100
+            },
+            {
+              "name": "pepperoni",
+              "price": 100
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "PIES",
+      "name": "Cheese Pie",
+      "description": "With 4 different kinds of cheese",
+      "price": 350,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/9f9f98a0-5c50-11ed-95dd-8a0e457155b9_tiropita.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 11,
+          "values": [
+            {
+              "name": "chicken",
+              "price": 150
+            },
+            {
+              "name": "cheese",
+              "price": 150
+            },
+            {
+              "name": "halloumi",
+              "price": 150
+            },
+            {
+              "name": "feta",
+              "price": 150
+            },
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "sweet corn",
+              "price": 70
+            },
+            {
+              "name": "green pepper",
+              "price": 70
+            },
+            {
+              "name": "ham",
+              "price": 100
+            },
+            {
+              "name": "pepperoni",
+              "price": 100
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "PIES",
+      "name": "Chili Cheese Pie 🌶️",
+      "description": "With 4 different kinds of cheese and spicy B'N'T sauce",
+      "price": 450,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/8cf5ec54-5c50-11ed-96ac-f656824fadd6_spicy_cheese_pie.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 11,
+          "values": [
+            {
+              "name": "chicken",
+              "price": 150
+            },
+            {
+              "name": "cheese",
+              "price": 150
+            },
+            {
+              "name": "halloumi",
+              "price": 150
+            },
+            {
+              "name": "feta",
+              "price": 150
+            },
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "sweet corn",
+              "price": 70
+            },
+            {
+              "name": "green pepper",
+              "price": 70
+            },
+            {
+              "name": "ham",
+              "price": 100
+            },
+            {
+              "name": "pepperoni",
+              "price": 100
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "PIES",
+      "name": "Feta Cheese Pie",
+      "description": "Greek feta cheese sprinkled with cheddar",
+      "price": 250,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/bdc45114-5c4f-11ed-b267-1ed3318ad821_fetopita.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 2,
+          "values": [
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "PIES",
+      "name": "Cheezy Chicken",
+      "description": "Juicy chicken breast loaded with our unique blend of creamy cheezy sauce",
+      "price": 430,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/shared/68490fea-d272-11ef-8455-d6656c0c376c_32504f70_d272_11ef_a84d_0e8f7af87371_20241120_131344.png",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "VEGAN PIES",
+      "name": "Vegan Cheese Pie",
+      "description": "Vegan cheese",
+      "price": 350,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/a6f0ddc6-5c50-11ed-9c28-8a0e457155b9_tiropita.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 5,
+          "values": [
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "sweet corn",
+              "price": 70
+            },
+            {
+              "name": " tomato",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "green peppers ",
+              "price": 70
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "VEGAN PIES",
+      "name": "Vegan Lahmajoun",
+      "description": "Mushrooms and soya with B'N'T sauce herbs and spices. Served with fresh lemon",
+      "price": 250,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/4e9c3e68-5c50-11ed-9101-0a39143d3213_vegan_laxmatzoun.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 6,
+          "values": [
+            {
+              "name": "cheese",
+              "price": 150
+            },
+            {
+              "name": "halloumi",
+              "price": 150
+            },
+            {
+              "name": "feta",
+              "price": 150
+            },
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            },
+            {
+              "name": "lettuce",
+              "price": 70
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "VEGAN PIES",
+      "name": "Chili Pie 🌶️",
+      "description": "Red chili paste, herbs and spices",
+      "price": 300,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/6e4c30a6-5c50-11ed-bcd6-62af137f9d15_piperopita.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 9,
+          "values": [
+            {
+              "name": "chicken",
+              "price": 150
+            },
+            {
+              "name": "cheese",
+              "price": 150
+            },
+            {
+              "name": "halloumi",
+              "price": 150
+            },
+            {
+              "name": "feta",
+              "price": 150
+            },
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "sweet corn",
+              "price": 70
+            },
+            {
+              "name": "green pepper",
+              "price": 70
+            },
+            {
+              "name": "ham",
+              "price": 100
+            },
+            {
+              "name": "pepperoni",
+              "price": 100
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "VEGAN PIES",
+      "name": "Oregano Pie",
+      "description": "Oregano, sesame, olive oil and 13 aromatic herbs. Served with tomato and fresh mint leaves",
+      "price": 250,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/85fc6c48-5c50-11ed-9ca6-9e9655067df8_riganopita.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Remove ingredients",
+          "min": 0,
+          "max": 2,
+          "values": [
+            {
+              "name": "no tomato",
+              "price": 0
+            },
+            {
+              "name": "no fresh mint leaves",
+              "price": 0
+            }
+          ]
+        },
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 7,
+          "values": [
+            {
+              "name": "cheese",
+              "price": 150
+            },
+            {
+              "name": "halloumi",
+              "price": 150
+            },
+            {
+              "name": "feta",
+              "price": 150
+            },
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            },
+            {
+              "name": "lettuce",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "VEGAN PIES",
+      "name": "Vegan Spicy Cheese Pie 🌶️",
+      "description": "Vegan cheese, red chili paste, herbs, spices",
+      "price": 450,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/abff55b8-5c50-11ed-8b3d-f65ab3bf222e_spicy_cheese_pie.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 5,
+          "values": [
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "sweet corn",
+              "price": 70
+            },
+            {
+              "name": " tomato",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "green peppers ",
+              "price": 70
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "VEGAN PIES",
+      "name": "Potato Pie",
+      "description": "Mashed potatoes, caramelized onions, black pepper and parsley",
+      "price": 250,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/607cc1ac-5c50-11ed-b23e-fa97c94acae7_patatopita.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "VEGAN PIES",
+      "name": "Spicy Potato Pie 🌶️",
+      "description": "Potatoes, fresh coriander, garlic, hot chili paste",
+      "price": 250,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/1a0f3326-5c50-11ed-9724-a25ab25218b2_spicy_patatopita.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "VEGAN PIES",
+      "name": "Spinach Pie",
+      "description": "Fresh spinach, onions and homemade pomegranate balsamic and sumac",
+      "price": 250,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/0934239a-5c50-11ed-82e5-9e9655067df8_spanaxopita.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 3,
+          "values": [
+            {
+              "name": "extra cheese",
+              "price": 150
+            },
+            {
+              "name": "extra halloumi",
+              "price": 150
+            },
+            {
+              "name": "extra feta",
+              "price": 150
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "VEGAN PIES",
+      "name": "Veggie Pie",
+      "description": "Chopped cabbage, carrots, onions, sweet corn and paprika",
+      "price": 250,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/438a46d2-5c50-11ed-8c66-8a0e457155b9_laxanopita.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "VEGAN PIES",
+      "name": "Curry Veggie Pie 🌶️",
+      "description": "Chopped cabbage, carrots, onions, sweet corn, green peas and curry",
+      "price": 250,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/3f584b22-5c50-11ed-a3cf-8a0e457155b9_laxanopita_me_curry.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 3,
+          "values": [
+            {
+              "name": "extra cheese",
+              "price": 150
+            },
+            {
+              "name": "extra halloumi",
+              "price": 150
+            },
+            {
+              "name": "extra feta",
+              "price": 150
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "VEGAN PIES",
+      "name": "Olive Pie",
+      "description": "Black and green sliced olives, fresh coriander and B'N'T herbs",
+      "price": 250,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/b144d7ec-5c4f-11ed-9a80-6e461225e9d3_eliopita.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "PIZZA",
+      "name": "Pepperoni Pizza",
+      "description": "4 different kinds of cheese, sweet corn, salami pepperoni, B'N'T tomato sauce chili sauce",
+      "price": 570,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/76cc8e10-5c50-11ed-a58d-f656824fadd6_pizza_peperoni.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Remove ingredients",
+          "min": 0,
+          "max": 4,
+          "values": [
+            {
+              "name": "no sweet corn",
+              "price": 0
+            },
+            {
+              "name": "no salami pepperoni",
+              "price": 0
+            },
+            {
+              "name": "no B'N'T tomato sauce",
+              "price": 0
+            },
+            {
+              "name": "no chilli sauce",
+              "price": 0
+            }
+          ]
+        },
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 11,
+          "values": [
+            {
+              "name": "chicken",
+              "price": 150
+            },
+            {
+              "name": "cheese",
+              "price": 150
+            },
+            {
+              "name": "halloumi",
+              "price": 150
+            },
+            {
+              "name": "feta",
+              "price": 150
+            },
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "sweet corn",
+              "price": 70
+            },
+            {
+              "name": "green pepper",
+              "price": 70
+            },
+            {
+              "name": "ham",
+              "price": 100
+            },
+            {
+              "name": "pepperoni",
+              "price": 100
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "PIZZA",
+      "name": "Vegetarian Pizza",
+      "description": "4 different kinds of cheese, black olives, sweet corn, green pepper, fresh tomato and B'N'T tomato sauce",
+      "price": 570,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/f5c80498-5c4f-11ed-8299-2a612948558d_pizza_vegie.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Remove ingredients",
+          "min": 0,
+          "max": 5,
+          "values": [
+            {
+              "name": "no black olives",
+              "price": 0
+            },
+            {
+              "name": "no sweet corn",
+              "price": 0
+            },
+            {
+              "name": "no green pepper",
+              "price": 0
+            },
+            {
+              "name": "no fresh tomato",
+              "price": 0
+            },
+            {
+              "name": "no B'N'T tomato sauce",
+              "price": 0
+            }
+          ]
+        },
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 11,
+          "values": [
+            {
+              "name": "chicken",
+              "price": 150
+            },
+            {
+              "name": "cheese",
+              "price": 150
+            },
+            {
+              "name": "halloumi",
+              "price": 150
+            },
+            {
+              "name": "feta",
+              "price": 150
+            },
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "sweet corn",
+              "price": 70
+            },
+            {
+              "name": "green pepper",
+              "price": 70
+            },
+            {
+              "name": "ham",
+              "price": 100
+            },
+            {
+              "name": "pepperoni",
+              "price": 100
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "PIZZA",
+      "name": "Pizza Special",
+      "description": "4 different kinds of cheese, ham, pepperoni, black olives, sweet corn, green pepper, fresh tomato and B'N'T tomato sauce",
+      "price": 670,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/7bd240da-5c50-11ed-88d4-4ecdec6c7e76_pizza_special.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Remove ingredients",
+          "min": 0,
+          "max": 7,
+          "values": [
+            {
+              "name": "no ham",
+              "price": 0
+            },
+            {
+              "name": "no pepperoni",
+              "price": 0
+            },
+            {
+              "name": "no black olives",
+              "price": 0
+            },
+            {
+              "name": "no sweet corn ",
+              "price": 0
+            },
+            {
+              "name": "no green pepper",
+              "price": 0
+            },
+            {
+              "name": "no fresh tomato",
+              "price": 0
+            },
+            {
+              "name": "no B'N'T tomato sauce",
+              "price": 0
+            }
+          ]
+        },
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 11,
+          "values": [
+            {
+              "name": "chicken",
+              "price": 150
+            },
+            {
+              "name": "cheese",
+              "price": 150
+            },
+            {
+              "name": "halloumi",
+              "price": 150
+            },
+            {
+              "name": "feta",
+              "price": 150
+            },
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "sweet corn",
+              "price": 70
+            },
+            {
+              "name": "green pepper",
+              "price": 70
+            },
+            {
+              "name": "ham",
+              "price": 100
+            },
+            {
+              "name": "pepperoni",
+              "price": 100
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "PIZZA",
+      "name": "Margarita Pizza",
+      "description": "4 different kinds of cheese and B'N'T tomato sauce",
+      "price": 550,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/e7f87938-5c4f-11ed-bd25-76fbffa360ba_pizza_margherita.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Remove ingredients",
+          "min": 0,
+          "max": 1,
+          "values": [
+            {
+              "name": "no B'N'T tomato sauce",
+              "price": 0
+            }
+          ]
+        },
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 11,
+          "values": [
+            {
+              "name": "chicken",
+              "price": 150
+            },
+            {
+              "name": "cheese",
+              "price": 150
+            },
+            {
+              "name": "halloumi",
+              "price": 150
+            },
+            {
+              "name": "feta",
+              "price": 150
+            },
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "sweet corn",
+              "price": 70
+            },
+            {
+              "name": "green pepper",
+              "price": 70
+            },
+            {
+              "name": "ham",
+              "price": 100
+            },
+            {
+              "name": "pepperoni",
+              "price": 100
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "PIZZA",
+      "name": "Pizza Bake N Take",
+      "description": "4 different kinds of cheese, ham, black olives and B'N'T tomato sauce",
+      "price": 570,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/e2275254-5c4f-11ed-8ca9-9e9655067df8_pizza_bake_n_take.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Remove ingredients",
+          "min": 0,
+          "max": 3,
+          "values": [
+            {
+              "name": "no ham",
+              "price": 0
+            },
+            {
+              "name": "no black olives",
+              "price": 0
+            },
+            {
+              "name": "no B'N'T tomato sauce",
+              "price": 0
+            }
+          ]
+        },
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 11,
+          "values": [
+            {
+              "name": "chicken",
+              "price": 150
+            },
+            {
+              "name": "cheese",
+              "price": 150
+            },
+            {
+              "name": "halloumi",
+              "price": 150
+            },
+            {
+              "name": "feta",
+              "price": 150
+            },
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "sweet corn",
+              "price": 70
+            },
+            {
+              "name": "green pepper",
+              "price": 70
+            },
+            {
+              "name": "ham",
+              "price": 100
+            },
+            {
+              "name": "pepperoni",
+              "price": 100
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "PIZZA",
+      "name": "Chicken Pizza",
+      "description": "Marinated chicken, 4 kinds of cheese, black olives, sweet corn, green peppers, fresh tomatoes and BNT tomato sauce",
+      "price": 670,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/f16110e8-5c4f-11ed-9d3e-2a612948558d_pizza_me_kotopoulo.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Remove ingredients",
+          "min": 0,
+          "max": 7,
+          "values": [
+            {
+              "name": "no marinated chicken",
+              "price": 0
+            },
+            {
+              "name": "no four kinds of cheeses",
+              "price": 0
+            },
+            {
+              "name": "no black olives",
+              "price": 0
+            },
+            {
+              "name": "no sweet corn ",
+              "price": 0
+            },
+            {
+              "name": "no green pepper",
+              "price": 0
+            },
+            {
+              "name": "no fresh tomato",
+              "price": 0
+            },
+            {
+              "name": "no B'N'T tomato sauce",
+              "price": 0
+            }
+          ]
+        },
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 11,
+          "values": [
+            {
+              "name": "chicken",
+              "price": 150
+            },
+            {
+              "name": "cheese",
+              "price": 150
+            },
+            {
+              "name": "halloumi",
+              "price": 150
+            },
+            {
+              "name": "feta",
+              "price": 150
+            },
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "sweet corn",
+              "price": 70
+            },
+            {
+              "name": "green pepper",
+              "price": 70
+            },
+            {
+              "name": "ham",
+              "price": 100
+            },
+            {
+              "name": "pepperoni",
+              "price": 100
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "PIZZA",
+      "name": "Spicy Special Pizza",
+      "description": "Red chili paste with herbs and spices, 4 different kinds of cheese, halloumi, salami, sweet corn and black olives",
+      "price": 700,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/919ccf52-5c50-11ed-a1ac-a25ab25218b2_spicy_special_pizza.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Remove ingredients",
+          "min": 0,
+          "max": 6,
+          "values": [
+            {
+              "name": "no salami pepperoni",
+              "price": 0
+            },
+            {
+              "name": "no four kinds of cheeses",
+              "price": 0
+            },
+            {
+              "name": "no black olives",
+              "price": 0
+            },
+            {
+              "name": "no sweet corn ",
+              "price": 0
+            },
+            {
+              "name": "no halloumi cheese",
+              "price": 0
+            },
+            {
+              "name": "no tomato sauce",
+              "price": 0
+            }
+          ]
+        },
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 3,
+          "values": [
+            {
+              "name": "extra cheese",
+              "price": 150
+            },
+            {
+              "name": "extra halloumi",
+              "price": 150
+            },
+            {
+              "name": "extra feta",
+              "price": 150
+            }
+          ]
+        },
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 11,
+          "values": [
+            {
+              "name": "chicken",
+              "price": 150
+            },
+            {
+              "name": "cheese",
+              "price": 150
+            },
+            {
+              "name": "halloumi",
+              "price": 150
+            },
+            {
+              "name": "feta",
+              "price": 150
+            },
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "tomato",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "sweet corn",
+              "price": 70
+            },
+            {
+              "name": "green pepper",
+              "price": 70
+            },
+            {
+              "name": "ham",
+              "price": 100
+            },
+            {
+              "name": "pepperoni",
+              "price": 100
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "PIZZA",
+      "name": "Chicken n Bacon Pizza",
+      "description": "Marinated chicken, crispy bacon, 4 kinds of cheese and BNT tomato sauce",
+      "price": 670,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/shared/0383a340-d272-11ef-8d18-b29e50828ef7_img_20250111_wa0000.jpg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "VEGAN PIZZA",
+      "name": "Vegan Margarita Pizza",
+      "description": "Vegan cheese and B'N'T tomato sauce",
+      "price": 550,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/b1de3ca6-5c50-11ed-bd60-42915c52bea7_pizza_margherita.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Remove ingredients",
+          "min": 0,
+          "max": 1,
+          "values": [
+            {
+              "name": "no B'N'T tomato sauce",
+              "price": 0
+            }
+          ]
+        },
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 5,
+          "values": [
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "sweet corn",
+              "price": 70
+            },
+            {
+              "name": " tomato",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "green peppers ",
+              "price": 70
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "VEGAN PIZZA",
+      "name": "Vegan Veggie Pizza",
+      "description": "vegan cheese, black olives, sweet corn, green pepper, fresh tomato and B'N'T tomato sauce",
+      "price": 570,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/2fdcd606-6a6d-11ed-92d5-86b8c0553925_f5c80498_5c4f_11ed_8299_2a612948558d_pizza_vegie.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Remove ingredients",
+          "min": 0,
+          "max": 5,
+          "values": [
+            {
+              "name": "no black olives",
+              "price": 0
+            },
+            {
+              "name": "no sweet corn",
+              "price": 0
+            },
+            {
+              "name": "no green pepper",
+              "price": 0
+            },
+            {
+              "name": "no fresh tomato",
+              "price": 0
+            },
+            {
+              "name": "no B'N'T tomato sauce",
+              "price": 0
+            }
+          ]
+        },
+        {
+          "name": "Add extra toppings",
+          "min": 0,
+          "max": 5,
+          "values": [
+            {
+              "name": "vegan cheese",
+              "price": 150
+            },
+            {
+              "name": "sweet corn",
+              "price": 70
+            },
+            {
+              "name": " tomato",
+              "price": 70
+            },
+            {
+              "name": "olives",
+              "price": 70
+            },
+            {
+              "name": "green peppers ",
+              "price": 70
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "FALAFEL",
+      "name": "Falafel Sandwich",
+      "description": "Fried minced chickpea balls with oriental spices. Served in our pita bread with tomato, lettuce and tahini",
+      "price": 370,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/b8dc0c32-5c4f-11ed-ba1e-6e461225e9d3_falafel_wrap.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Remove ingedients",
+          "min": 0,
+          "max": 3,
+          "values": [
+            {
+              "name": "no tomato",
+              "price": 0
+            },
+            {
+              "name": "no lettuce",
+              "price": 0
+            },
+            {
+              "name": "no tahini",
+              "price": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "FALAFEL",
+      "name": "Falafel In A Box",
+      "description": "6 pieces of chickpea and fava balls, with oriental spices, lettuce, tomatoes, and special BNT tahini sauce",
+      "price": 650,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/2a0324e0-5c50-11ed-92a4-fab1370738b2_falafel_in_a_box.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Add extra",
+          "min": 0,
+          "max": 10,
+          "values": [
+            {
+              "name": "falafel ball",
+              "price": 50
+            },
+            {
+              "name": "pita",
+              "price": 50
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "KOUPES",
+      "name": "Koupes (per piece)",
+      "description": "Bulgur shell stuffed with juicy pork minced meat. Served with lemon",
+      "price": 220,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/cebeb464-5c4f-11ed-8ea4-129bf65f66b1_koupes.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Lemon",
+          "min": 0,
+          "max": 1,
+          "values": [
+            {
+              "name": "add lemon",
+              "price": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "KOUPES",
+      "name": "Vegan Mushroom Koupes Small (per piece)",
+      "description": "Bulgur shell stuffed with mushroom. Served with lemon",
+      "price": 100,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/d56d0dec-5c4f-11ed-b1d8-36aa9e3cba97_koupes_manitari.jpeg",
+      "in_stock": true,
+      "options": [
+        {
+          "name": "Lemon",
+          "min": 0,
+          "max": 1,
+          "values": [
+            {
+              "name": "add lemon",
+              "price": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "APPETIZERS",
+      "name": "BNT Specialty Pita Bread",
+      "description": "",
+      "price": 50,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/24a62402-5c50-11ed-ad08-8ad41b3d9a80_bake_n_take_psomaki.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "APPETIZERS",
+      "name": "BNT Specialty Tahini Sauce 0.10 l",
+      "description": "",
+      "price": 100,
+      "image_url": "",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "APPETIZERS",
+      "name": "BNT Specialty Tahini Sauce 0.25 l",
+      "description": "",
+      "price": 250,
+      "image_url": "",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "APPETIZERS",
+      "name": "BNT Specialty Chilli Sauce 0.10 l",
+      "description": "",
+      "price": 100,
+      "image_url": "",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "APPETIZERS",
+      "name": "BNT Specialty Chilli Sauce 0.25 l",
+      "description": "",
+      "price": 200,
+      "image_url": "",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DESSERTS",
+      "name": "Tahini Pie",
+      "description": "Twisted pie stuffed with tahini, carob syrup, cinnamon and sprinkled with caramelized sugar",
+      "price": 350,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/9983ab82-5c50-11ed-b985-3292ee36c4f9_taxinopita.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DESSERTS",
+      "name": "Lebanese Muhallabieh",
+      "description": "Traditional Lebanese muhallabieh made with fresh milk, mastic and pistachio. 0.25 l",
+      "price": 300,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/58f411ec-5c50-11ed-abd5-36aa9e3cba97_maxalepi.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "Coca Cola",
+      "description": "0.33 l",
+      "price": 120,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c435c7912609d88364c7b8/0aa757b0-fd1e-11ec-8099-daf8f4eb4249_coca_cola.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "Coca Cola Zero",
+      "description": "0.33 l",
+      "price": 120,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c435c7912609d88364c7b8/0f879a24-fd1e-11ec-ab03-da3539168e9e_coca_cola_zero.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "Sprite",
+      "description": "0.33 l",
+      "price": 120,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c435c7912609d88364c7b8/e46505c4-fd1e-11ec-8eb9-6e693b70770b_sprite.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "Fanta",
+      "description": "0.33 l",
+      "price": 120,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c435c7912609d88364c7b8/eda23a4e-fd1e-11ec-a699-ae4dab3fc615_fanta.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "7up Zero",
+      "description": "0.33 l",
+      "price": 120,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/710c56f8-2dd5-11ed-a2de-5a9d6172c4e4_7up_free.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "Juice Peach",
+      "description": "",
+      "price": 120,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/adeb5772-2dd5-11ed-8e09-f2eec4182cc7_lanitis_peach_250ml__1_.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "Juice Apple",
+      "description": "",
+      "price": 120,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/88104d00-2dd5-11ed-8ea0-6ef22270d9d2_lanitis_apple_juice.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "Lipton Ice Tea Lemon",
+      "description": "",
+      "price": 120,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/95791804-2dd6-11ed-bd2c-ce98ce887bb6_lemon_ice_tea.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "Lipton Ice Tea Peach",
+      "description": "",
+      "price": 120,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/9e6a5b94-2dd6-11ed-a60a-ea82841950ca_lipton_peach_ice_tea.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "Juice Orange",
+      "description": "0.40 l",
+      "price": 220,
+      "image_url": "",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "Juice Cocktail",
+      "description": "0.40 l",
+      "price": 220,
+      "image_url": "",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "Hell Energy Drink Big",
+      "description": "0.50 l",
+      "price": 150,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/83ac2c6e-2dd7-11ed-ad00-26eff219381c_hell_500_ml.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "Hell Energy Drink Small",
+      "description": "",
+      "price": 100,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/7b1c2040-2dd7-11ed-890f-de2df921ff15_hell_500_ml.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "Airani",
+      "description": "0.50 l",
+      "price": 220,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/532c50dc-2dd7-11ed-a493-9a4edf28af2c_airani_olympos.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "Perrier Water",
+      "description": "0.33 l",
+      "price": 200,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/f02e8c98-2dd6-11ed-8f4c-5a9d6172c4e4_perrier__1_.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "Water",
+      "description": "0.50 l",
+      "price": 60,
+      "image_url": "https://wolt-menu-images-cdn.wolt.com/menu-images/62c5cae41424b8e67e02c761/6911d728-2dd7-11ed-b8dc-26f4f0a1f788_water.jpeg",
+      "in_stock": true,
+      "options": []
+    },
+    {
+      "category": "DRINKS",
+      "name": "Soda",
+      "description": "0.33 l",
+      "price": 120,
+      "image_url": "",
+      "in_stock": true,
+      "options": []
+    }
+  ]
+}
