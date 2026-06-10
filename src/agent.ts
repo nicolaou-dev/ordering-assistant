@@ -1,5 +1,5 @@
 import { system } from "./prompts/ordering_v1";
-import { generateText, Output } from "ai";
+import { generateText, Output, type ModelMessage } from "ai";
 import { Reply } from "./reply";
 import { Agent, callable } from "agents";
 import { getSettings } from "./settings";
@@ -28,7 +28,8 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       "claude-haiku-4-5",
     );
 
-    this.sql`INSERT INTO messages (role, content) VALUES ('user', ${prompt})`;
+    this
+      .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify(prompt)})`;
 
     const rows = this.sql<{
       role: string;
@@ -36,22 +37,21 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     }>`SELECT role, content FROM messages ORDER BY id`;
 
     const messages = rows.map((r) => ({
-      role: r.role as "user" | "assistant",
-      content:
-        r.role === "assistant"
-          ? (JSON.parse(r.content) as Reply[]).map((x) => x.body).join("\n")
-          : r.content,
-    }));
+      role: r.role,
+      content: JSON.parse(r.content),
+    })) as ModelMessage[];
 
-    const { output: replies } = await generateText({
+    const { output: replies, response } = await generateText({
       model,
       system,
       messages,
       output,
     });
 
-    this
-      .sql`INSERT INTO messages (role, content) VALUES ('assistant', ${JSON.stringify(replies)})`;
+    for (const message of response.messages) {
+      this
+        .sql`INSERT INTO messages (role, content) VALUES (${message.role}, ${JSON.stringify(message.content)})`;
+    }
 
     return replies;
   }
