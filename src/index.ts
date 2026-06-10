@@ -31,11 +31,18 @@ app.get("/webhook/whatsapp", (c) => {
   return c.text("Forbidden", 403);
 });
 
-const Inbound = z.object({
-  from: z.string(),
-  id: z.string(),
-  type: z.string(),
-  text: z.object({ body: z.string() }).optional(),
+const Value = z.object({
+  metadata: z.object({ phone_number_id: z.string() }),
+  messages: z
+    .array(
+      z.object({
+        from: z.string(),
+        id: z.string(),
+        type: z.string(),
+        text: z.object({ body: z.string() }).optional(),
+      }),
+    )
+    .nonempty(),
 });
 
 app.post("/webhook/whatsapp", async (c) => {
@@ -54,14 +61,16 @@ app.post("/webhook/whatsapp", async (c) => {
   }
 
   const body = JSON.parse(rawBody);
-  const msg = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-  const inbound = Inbound.safeParse(msg);
+  const value = body?.entry?.[0]?.changes?.[0]?.value;
+  const parsed = Value.safeParse(value);
 
-  if (!inbound.success) {
+  if (!parsed.success) {
     return c.body(null, 200);
   }
 
-  const { from, id, text } = inbound.data;
+  const { phone_number_id } = parsed.data.metadata;
+  const { from, id, text } = parsed.data.messages[0];
+  const sessionKey = `${phone_number_id}:${from}`;
 
   const handleInbound = async () => {
     const result = await c.env.DB.prepare(
@@ -79,7 +88,7 @@ app.post("/webhook/whatsapp", async (c) => {
 
     if (!text?.body) return;
 
-    const stub = await getAgentByName(c.env.OrderAgent, from);
+    const stub = await getAgentByName(c.env.OrderAgent, sessionKey);
     const replies = await stub.runTurn(text.body);
 
     const client = createClient(settings);

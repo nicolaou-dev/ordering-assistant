@@ -10,6 +10,16 @@ type OrderState = {};
 export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   initialState: OrderState = {};
 
+  get shopId(): string {
+    const [shopId, customer] = this.name.split(":");
+    if (!shopId || !customer) {
+      throw new Error(
+        `OrderAgent name is not "<phone_number_id>:<from>": ${this.name}`,
+      );
+    }
+    return shopId;
+  }
+
   onStart() {
     this.sql`CREATE TABLE IF NOT EXISTS messages (
       id INTEGER PRIMARY KEY,
