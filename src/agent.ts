@@ -1,9 +1,10 @@
 import { system } from "./prompts/ordering_v1";
-import { generateText, Output, type ModelMessage } from "ai";
+import { generateText, Output, stepCountIs, tool, type ModelMessage } from "ai";
 import { Reply } from "./reply";
 import { Agent, callable } from "agents";
 import { getSettings } from "./settings";
 import { createAnthropic } from "@ai-sdk/anthropic";
+import z from "zod";
 
 type OrderState = {};
 
@@ -33,6 +34,27 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   async runTurn(prompt: string): Promise<Reply[]> {
     const output = Output.array({ element: Reply });
     const settings = getSettings(this.env);
+    const find_products = tool({
+      description:
+        "Find products in this shop's catalog by name or keyword. Returns matching products with price and stock. Call once per product the customer asks about.",
+      inputSchema: z.object({
+        query: z.string(),
+      }),
+      execute: async ({ query }) => {
+        const { results } = await this.env.DB.prepare(
+          `
+          SELECT p.product_id, p.name, p.description, p.category, p.price_minor, p.currency, p.in_stock
+          FROM products_fts f JOIN products p ON p.rowid = f.rowid    
+          WHERE products_fts MATCH ?1 AND p.shop_id = ?2 AND p.deleted_at IS NULL
+          LIMIT 10
+        `,
+        )
+          .bind(query, this.shopId)
+          .all();
+
+        return results;
+      },
+    });
 
     const model = createAnthropic({ apiKey: settings.ANTHROPIC_API_KEY })(
       "claude-haiku-4-5",
@@ -56,6 +78,10 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       system,
       messages,
       output,
+      tools: {
+        find_products,
+      },
+      stopWhen: stepCountIs(5),
     });
 
     for (const message of response.messages) {
