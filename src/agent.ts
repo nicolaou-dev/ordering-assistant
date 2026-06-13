@@ -10,9 +10,11 @@ import {
   addItem,
   removeItem,
   setFulfillment,
+  setAddress,
   emptyOrder,
   renderOrderSnapshot,
   type OrderState,
+  type Address,
 } from "./order";
 import z from "zod";
 
@@ -43,6 +45,27 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
 
   @callable()
   async runTurn(prompt: string): Promise<Reply[]> {
+    this
+      .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify(prompt)})`;
+    return this.runModel();
+  }
+
+  /**
+   * A completed delivery-address form came back. Writing the address is a
+   * deterministic state edit, never an LLM turn: we set it directly, drop a
+   * brief marker in history so the model knows the form returned (it never sees
+   * or parses the fields — they're in the order snapshot), then run one turn so
+   * it reacts to the new state and continues the loop.
+   */
+  @callable()
+  async completeAddress(address: Address): Promise<Reply[]> {
+    this.setState(setAddress(this.state, address));
+    this
+      .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify("[The customer submitted their delivery address. It's in the order snapshot.]")})`;
+    return this.runModel();
+  }
+
+  private async runModel(): Promise<Reply[]> {
     const output = Output.array({ element: Reply });
     const settings = getSettings(this.env);
     const db = createDb(settings);
@@ -155,9 +178,6 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     const model = createAnthropic({ apiKey: settings.ANTHROPIC_API_KEY })(
       "claude-haiku-4-5",
     );
-
-    this
-      .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify(prompt)})`;
 
     const rows = this.sql<{
       role: string;

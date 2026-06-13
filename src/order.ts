@@ -61,6 +61,15 @@ export function setFulfillment(
 }
 
 /**
+ * Attach a completed delivery address to the order, returning the next state.
+ * Pure: a completed form supplies the fields; the model never parses or
+ * composes them, and this never collects them itself.
+ */
+export function setAddress(state: OrderState, address: Address): OrderState {
+  return { ...state, fulfillment: { ...state.fulfillment, address } };
+}
+
+/**
  * Add qty of a product to the order, returning the next state. Merges into the
  * existing line if the product is already present, and keeps total_minor in
  * step. Pure: the caller fetches the product and checks stock first.

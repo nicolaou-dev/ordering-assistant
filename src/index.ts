@@ -4,6 +4,7 @@ import { OrderAgent } from "./agent";
 import { verifySignature } from "./verify";
 import z from "zod";
 import { createClient } from "./whatsapp/client";
+import type { Address } from "./order";
 import { createAdminDb, createDb, withShop } from "./db";
 import { getAgentByName } from "agents";
 import * as XLSX from "xlsx";
@@ -227,6 +228,19 @@ app.post("/debug/chat", async (c) => {
   }>();
   const stub = await getAgentByName(c.env.OrderAgent, instance);
   const replies = await stub.runTurn(message);
+  return c.json({ replies });
+});
+
+// Debug-only stand-in for the real flow-completion webhook: writes a structured
+// address into the order and continues the loop, so the whole LLM flow is
+// testable without WhatsApp.
+app.post("/debug/address", async (c) => {
+  const { instance, address } = await c.req.json<{
+    instance: string;
+    address: Address;
+  }>();
+  const stub = await getAgentByName(c.env.OrderAgent, instance);
+  const replies = await stub.completeAddress(address);
   return c.json({ replies });
 });
 
