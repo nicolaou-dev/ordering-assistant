@@ -3,10 +3,15 @@ import { generateText, Output, stepCountIs, tool, type ModelMessage } from "ai";
 import { Reply } from "./reply";
 import { Agent, callable } from "agents";
 import { getSettings } from "./settings";
+import { createDb, withShop } from "./db";
+import { guardQuery } from "./query_guard";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import z from "zod";
 
 type OrderState = {};
+
+/** Max rows returned to the model from one query_data call. */
+const ROW_CAP = 50;
 
 export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   initialState: OrderState = {};
@@ -34,25 +39,28 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   async runTurn(prompt: string): Promise<Reply[]> {
     const output = Output.array({ element: Reply });
     const settings = getSettings(this.env);
-    const find_products = tool({
+    const db = createDb(settings);
+    const query_data = tool({
       description:
-        "Find products in this shop's catalog by name or keyword. Returns matching products with price and stock. Call once per product the customer asks about.",
+        "Run a read-only SQL SELECT against this shop's catalog (products, shops). Results are automatically scoped to this shop. Returns up to " +
+        ROW_CAP +
+        " rows; if truncated is true, narrow the query.",
       inputSchema: z.object({
-        query: z.string(),
+        sql: z.string().describe("A single SELECT/CTE against products/shops."),
       }),
-      execute: async ({ query }) => {
-        const { results } = await this.env.DB.prepare(
-          `
-          SELECT p.product_id, p.name, p.description, p.category, p.price_minor, p.currency, p.in_stock
-          FROM products_fts f JOIN products p ON p.rowid = f.rowid    
-          WHERE products_fts MATCH ?1 AND p.shop_id = ?2 AND p.deleted_at IS NULL
-          LIMIT 10
-        `,
-        )
-          .bind(query, this.shopId)
-          .all();
+      execute: async ({ sql }) => {
+        const guard = guardQuery(sql);
+        if ("error" in guard) return { error: guard.error };
 
-        return results;
+        // Wrap to cap rows: only safe because the guard proved a single SELECT.
+        const capped = `SELECT * FROM (${guard.sql}) AS _q LIMIT ${ROW_CAP + 1}`;
+        try {
+          const [rows] = await withShop(db, this.shopId, [db.query(capped)]);
+          const truncated = rows.length > ROW_CAP;
+          return { rows: truncated ? rows.slice(0, ROW_CAP) : rows, truncated };
+        } catch (e) {
+          return { error: (e as Error).message };
+        }
       },
     });
 
@@ -79,7 +87,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       messages,
       output,
       tools: {
-        find_products,
+        query_data,
       },
       stopWhen: stepCountIs(5),
     });
