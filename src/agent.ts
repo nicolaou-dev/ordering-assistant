@@ -8,6 +8,7 @@ import { guardQuery } from "./query_guard";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import {
   addItem,
+  removeItem,
   emptyOrder,
   renderOrderSnapshot,
   type OrderState,
@@ -104,6 +105,27 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       },
     });
 
+    const remove_item = tool({
+      description:
+        "Remove qty of a product (by product_id) already in the order, decrementing that line. If qty reaches or exceeds the line's quantity, the line is dropped. The total is handled for you; returns the updated order, or an error with nothing changed.",
+      inputSchema: z.object({
+        product_id: z
+          .string()
+          .describe("The product_id of a line already in the order."),
+        qty: z.number().int().positive().describe("How many to remove."),
+      }),
+      execute: async ({ product_id, qty }) => {
+        if (!this.state.items.some((i) => i.product_id === product_id))
+          return {
+            error: `product_id "${product_id}" is not in the order. Check the current order snapshot.`,
+          };
+
+        const next = removeItem(this.state, product_id, qty);
+        this.setState(next);
+        return next;
+      },
+    });
+
     // One scoped read per turn: shop name + categories with item counts. RLS
     // already limits both to this shop, so neither query needs a shop_id filter.
     const [nameRows, catRows] = await withShop(db, this.shopId, [
@@ -139,6 +161,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       tools: {
         query_data,
         add_item,
+        remove_item,
       },
       stopWhen: stepCountIs(5),
     });

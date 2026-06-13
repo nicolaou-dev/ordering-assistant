@@ -38,6 +38,29 @@ export function addItem(
 }
 
 /**
+ * Remove qty of a product from the order, returning the next state. Decrements
+ * the existing line, dropping it entirely when qty meets or exceeds the current
+ * quantity (clamped at 0), and keeps total_minor in step. Pure: the caller
+ * confirms the product is in the order first.
+ */
+export function removeItem(
+  state: OrderState,
+  product_id: string,
+  qty: number,
+): OrderState {
+  const existing = state.items.find((i) => i.product_id === product_id)!;
+  const removed = Math.min(qty, existing.qty);
+  const items = state.items
+    .map((i) => ({ ...i }))
+    .filter((i) => {
+      if (i.product_id !== product_id) return true;
+      i.qty -= removed;
+      return i.qty > 0;
+    });
+  return { items, total_minor: state.total_minor - removed * existing.unit_price_minor };
+}
+
+/**
  * Render the live order state as a compact, clearly-labelled block for the
  * model. Prepended after the static prompt each turn so the model always reads
  * THE current order it is completing. Amounts are raw minor units (cents) —
