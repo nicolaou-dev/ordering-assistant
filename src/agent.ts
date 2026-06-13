@@ -64,6 +64,16 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       },
     });
 
+    // One scoped read per turn: shop name + categories with item counts. RLS
+    // already limits both to this shop, so neither query needs a shop_id filter.
+    const [nameRows, catRows] = await withShop(db, this.shopId, [
+      db`SELECT name FROM shops`,
+      db`SELECT category, count(*)::int AS count
+         FROM products WHERE deleted_at IS NULL GROUP BY category`,
+    ]);
+    const shopName = (nameRows[0]?.name as string | undefined) ?? null;
+    const categories = catRows as { category: string; count: number }[];
+
     const model = createAnthropic({ apiKey: settings.ANTHROPIC_API_KEY })(
       "claude-haiku-4-5",
     );
@@ -83,7 +93,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
 
     const { output: replies, response } = await generateText({
       model,
-      system,
+      system: system({ shopName, categories }),
       messages,
       output,
       tools: {
