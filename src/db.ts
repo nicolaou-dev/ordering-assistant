@@ -12,6 +12,11 @@ export function createDb(settings: Settings): Sql {
   return neon(settings.DATABASE_URL);
 }
 
+/** Connects as the admin role (BYPASSRLS) — the catalog ingest path's role. */
+export function createAdminDb(settings: Settings): Sql {
+  return neon(settings.DATABASE_URL_ADMIN);
+}
+
 /**
  * Run queries scoped to one shop under row-level security.
  *

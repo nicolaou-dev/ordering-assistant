@@ -4,7 +4,7 @@ import { OrderAgent } from "./agent";
 import { verifySignature } from "./verify";
 import z from "zod";
 import { createClient } from "./whatsapp/client";
-import { createDb, withShop } from "./db";
+import { createAdminDb, createDb, withShop } from "./db";
 import { getAgentByName } from "agents";
 import * as XLSX from "xlsx";
 
@@ -122,7 +122,10 @@ const Row = z.object({
   price: z
     .union([z.string(), z.number()])
     .transform((p) => Number(p))
-    .refine((n) => Number.isInteger(n), "price must be an integer (minor units)"),
+    .refine(
+      (n) => Number.isInteger(n),
+      "price must be an integer (minor units)",
+    ),
   in_stock: z.boolean(),
 });
 
@@ -162,45 +165,38 @@ app.post("/admin/catalog/:shop_id", async (c) => {
       description: r.description ?? null,
       price_minor: r.price,
       image_url: r.image_url ?? null,
-      in_stock: r.in_stock ? 1 : 0,
+      in_stock: r.in_stock,
     })),
   );
-  const now = Date.now();
   const ids = products.map((p) => p.product_id);
 
-  await c.env.DB.prepare(
-    `INSERT INTO shops (phone_number_id, name, created_at) VALUES (?, ?, ?)
-      ON CONFLICT(phone_number_id) DO NOTHING`,
-  )
-    .bind(shopId, shopId, now)
-    .run();
-
-  const upserts = products.map((p) =>
-    c.env.DB.prepare(
-      `INSERT INTO products (product_id, shop_id, category, name, description, price_minor, image_url, in_stock, deleted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
-       ON CONFLICT(product_id) DO UPDATE SET
-         category=excluded.category, name=excluded.name, description=excluded.description,
-         price_minor=excluded.price_minor, image_url=excluded.image_url,
-         in_stock=excluded.in_stock, deleted_at=NULL`,
-    ).bind(
-      p.product_id,
-      shopId,
-      p.category,
-      p.name,
-      p.description,
-      p.price_minor,
-      p.image_url,
-      p.in_stock,
-    ),
-  );
-
-  const softDelete = c.env.DB.prepare(
-    `UPDATE products SET deleted_at=? WHERE shop_id=? AND deleted_at IS NULL
-       AND product_id NOT IN (SELECT value FROM json_each(?))`,
-  ).bind(now, shopId, JSON.stringify(ids));
-
-  await c.env.DB.batch([...upserts, softDelete]);
+  // The admin role has BYPASSRLS, so writes target the path's shop_id directly
+  // without set_config. One transaction: shop first (products FK it), then a
+  // single UNNEST upsert of every row, then soft-delete rows absent from this
+  // upload.
+  const sql = createAdminDb(settings);
+  await sql.transaction([
+    sql`INSERT INTO shops (phone_number_id, name) VALUES (${shopId}, ${shopId})
+        ON CONFLICT (phone_number_id) DO NOTHING`,
+    sql`INSERT INTO products (product_id, shop_id, category, name, description, price_minor, image_url, in_stock)
+        SELECT product_id, ${shopId}, category, name, description, price_minor, image_url, in_stock
+        FROM UNNEST(
+          ${ids}::text[],
+          ${products.map((p) => p.category)}::text[],
+          ${products.map((p) => p.name)}::text[],
+          ${products.map((p) => p.description)}::text[],
+          ${products.map((p) => p.price_minor)}::int[],
+          ${products.map((p) => p.image_url)}::text[],
+          ${products.map((p) => p.in_stock)}::boolean[]
+        ) AS t(product_id, category, name, description, price_minor, image_url, in_stock)
+        ON CONFLICT (product_id) DO UPDATE SET
+          category = excluded.category, name = excluded.name, description = excluded.description,
+          price_minor = excluded.price_minor, image_url = excluded.image_url,
+          in_stock = excluded.in_stock, deleted_at = NULL`,
+    sql`UPDATE products SET deleted_at = now()
+        WHERE shop_id = ${shopId} AND deleted_at IS NULL
+          AND NOT (product_id = ANY(${ids}))`,
+  ]);
 
   return c.json({ count: products.length });
 });
