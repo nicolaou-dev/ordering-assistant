@@ -11,14 +11,37 @@ export type OrderItem = {
   currency: string;
 };
 
+// How the order is handed over. type is null until the customer chooses;
+// address is added by a later ticket (the model never writes it).
+export type Fulfillment = {
+  type: "pickup" | "delivery" | null;
+};
+
 export type OrderState = {
   items: OrderItem[];
   // Updated by add_item as items change, so the snapshot and downstream
   // tickets read the total without re-summing.
   total_minor: number;
+  fulfillment: Fulfillment;
 };
 
-export const emptyOrder: OrderState = { items: [], total_minor: 0 };
+export const emptyOrder: OrderState = {
+  items: [],
+  total_minor: 0,
+  fulfillment: { type: null },
+};
+
+/**
+ * Set how the order is fulfilled, returning the next state. Switching type just
+ * overwrites the previous choice. Pure: the model captures the customer's
+ * answer; this never collects an address or any other detail itself.
+ */
+export function setFulfillment(
+  state: OrderState,
+  type: "pickup" | "delivery",
+): OrderState {
+  return { ...state, fulfillment: { ...state.fulfillment, type } };
+}
 
 /**
  * Add qty of a product to the order, returning the next state. Merges into the
@@ -34,7 +57,7 @@ export function addItem(
   const existing = items.find((i) => i.product_id === product.product_id);
   if (existing) existing.qty += qty;
   else items.push({ ...product, qty });
-  return { items, total_minor: state.total_minor + qty * product.unit_price_minor };
+  return { ...state, items, total_minor: state.total_minor + qty * product.unit_price_minor };
 }
 
 /**
@@ -57,7 +80,7 @@ export function removeItem(
       i.qty -= removed;
       return i.qty > 0;
     });
-  return { items, total_minor: state.total_minor - removed * existing.unit_price_minor };
+  return { ...state, items, total_minor: state.total_minor - removed * existing.unit_price_minor };
 }
 
 /**
@@ -69,7 +92,8 @@ export function removeItem(
  * add submission.
  */
 export function renderOrderSnapshot(state: OrderState): string {
-  const header = "## Current order\n\nStatus: draft";
+  const fulfillment = state.fulfillment.type ?? "not set yet";
+  const header = `## Current order\n\nStatus: draft\nFulfillment: ${fulfillment}`;
   if (state.items.length === 0) {
     return `${header}\n\n(empty — no items added yet)`;
   }

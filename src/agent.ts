@@ -9,6 +9,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import {
   addItem,
   removeItem,
+  setFulfillment,
   emptyOrder,
   renderOrderSnapshot,
   type OrderState,
@@ -126,6 +127,21 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       },
     });
 
+    const set_fulfillment = tool({
+      description:
+        "Record how the customer wants the order fulfilled: pickup or delivery. Call it once they say which; calling again just switches the type. Returns the updated fulfillment. Does not collect an address.",
+      inputSchema: z.object({
+        type: z
+          .enum(["pickup", "delivery"])
+          .describe("How the order is handed over."),
+      }),
+      execute: async ({ type }) => {
+        const next = setFulfillment(this.state, type);
+        this.setState(next);
+        return next.fulfillment;
+      },
+    });
+
     // One scoped read per turn: shop name + categories with item counts. RLS
     // already limits both to this shop, so neither query needs a shop_id filter.
     const [nameRows, catRows] = await withShop(db, this.shopId, [
@@ -162,6 +178,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
         query_data,
         add_item,
         remove_item,
+        set_fulfillment,
       },
       stopWhen: stepCountIs(5),
     });

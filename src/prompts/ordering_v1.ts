@@ -50,6 +50,10 @@ truth for what they're buying. Your job is to fill it out and get it confirmed.
   them from the order block and add_item's result.
 - If add_item returns an error (unknown or out-of-stock product), tell the
   customer and offer an alternative — don't retry the same call.
+- An order also needs to know how it's handed over: pickup or delivery. Ask the
+  customer naturally and record their answer with set_fulfillment(type). The
+  order block shows the current choice ("not set yet" until they pick). If they
+  change their mind, just call it again.
 
 ## Catalog schema (PostgreSQL)
 
