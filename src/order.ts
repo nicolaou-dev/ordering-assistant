@@ -11,10 +11,21 @@ export type OrderItem = {
   currency: string;
 };
 
+// A delivery address. The model can see the whole address but never edits it:
+// it's written by a completed form, never by a model tool.
+export type Address = {
+  line1: string;
+  line2?: string;
+  city: string;
+  postcode: string;
+  notes?: string;
+};
+
 // How the order is handed over. type is null until the customer chooses;
-// address is added by a later ticket (the model never writes it).
+// address stays null until a completed form writes it (delivery only).
 export type Fulfillment = {
   type: "pickup" | "delivery" | null;
+  address: Address | null;
 };
 
 export type OrderState = {
@@ -28,8 +39,14 @@ export type OrderState = {
 export const emptyOrder: OrderState = {
   items: [],
   total_minor: 0,
-  fulfillment: { type: null },
+  fulfillment: { type: null, address: null },
 };
+
+/** One-line address for the snapshot. The model reads it; it never composes it. */
+function formatAddress(a: Address): string {
+  const parts = [a.line1, a.line2, a.city, a.postcode].filter(Boolean);
+  return a.notes ? `${parts.join(", ")} (${a.notes})` : parts.join(", ");
+}
 
 /**
  * Set how the order is fulfilled, returning the next state. Switching type just
@@ -92,8 +109,13 @@ export function removeItem(
  * add submission.
  */
 export function renderOrderSnapshot(state: OrderState): string {
-  const fulfillment = state.fulfillment.type ?? "not set yet";
-  const header = `## Current order\n\nStatus: draft\nFulfillment: ${fulfillment}`;
+  const { type, address } = state.fulfillment;
+  const fulfillment = type ?? "not set yet";
+  let header = `## Current order\n\nStatus: draft\nFulfillment: ${fulfillment}`;
+  // Delivery needs an address; pickup shows no address line at all.
+  if (type === "delivery") {
+    header += `\nAddress: ${address ? formatAddress(address) : "needed"}`;
+  }
   if (state.items.length === 0) {
     return `${header}\n\n(empty — no items added yet)`;
   }
