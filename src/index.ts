@@ -4,6 +4,7 @@ import { OrderAgent } from "./agent";
 import { verifySignature } from "./verify";
 import z from "zod";
 import { createClient } from "./whatsapp/client";
+import { createDb, withShop } from "./db";
 import { getAgentByName } from "agents";
 import * as XLSX from "xlsx";
 
@@ -202,6 +203,25 @@ app.post("/admin/catalog/:shop_id", async (c) => {
   await c.env.DB.batch([...upserts, softDelete]);
 
   return c.json({ count: products.length });
+});
+
+app.get("/debug/rls/:shop_id", async (c) => {
+  const settings = getSettings(c.env);
+  const sql = createDb(settings);
+  const shopId = c.req.param("shop_id");
+
+  // Same query, two ways: unscoped (no app.shop_id) sees nothing because the
+  // RLS policy matches no rows; scoped sees only this shop's rows.
+  const unscoped = await sql`SELECT count(*)::int AS count FROM products`;
+  const scoped = await withShop(sql, shopId, [
+    sql`SELECT count(*)::int AS count FROM products`,
+  ]);
+
+  return c.json({
+    shop_id: shopId,
+    without_set_config: unscoped[0].count,
+    with_set_config: scoped[0][0].count,
+  });
 });
 
 app.post("/debug/chat", async (c) => {

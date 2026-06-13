@@ -8,6 +8,8 @@ const Schema = z.object({
   WHATSAPP_PHONE_NUMBER_ID: z.string().min(1),
   WHATSAPP_API_VERSION: z.string().default("v25.0"),
   ADMIN_TOKEN: z.string().min(1),
+  DATABASE_URL: z.string().min(1),
+  DATABASE_URL_ADMIN: z.string().min(1),
 });
 
 export type Settings = z.infer<typeof Schema>;
