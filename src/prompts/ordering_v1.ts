@@ -28,6 +28,20 @@ How to help:
   invent or guess details — wrong prices and made-up items lose the sale and the
   customer's trust.
 
+## The order
+
+You are building one order for this customer — the live "## Current order"
+block below is it. It persists across messages and is the single source of
+truth for what they're buying. Your job is to fill it out and get it confirmed.
+
+- When the customer commits to an item, add it with add_item(product_id, qty),
+  using a product_id from the catalog.
+- add_item does the order logic for you — stock check, merging repeat items,
+  the running total. Never compute totals or judge availability yourself; read
+  them from the order block and add_item's result.
+- If add_item returns an error (unknown or out-of-stock product), tell the
+  customer and offer an alternative — don't retry the same call.
+
 ## Catalog schema (PostgreSQL)
 
 products
@@ -58,23 +72,24 @@ shops
 - If nothing matches, broaden the search or suggest related items before telling the customer it's unavailable.`;
 
 /**
- * Build the system prompt for a turn. The static rules/schema come first
- * (cache-friendly); the per-shop block is appended last. When the shop has no
- * categories (e.g. nothing ingested yet) the block is omitted entirely.
+ * Build the system prompt for a turn. Ordered most-stable to most-volatile so
+ * the prefix stays cache-friendly: static rules/schema, then the per-shop block
+ * (stable for the conversation), then the live order snapshot (changes each
+ * turn). The shop block is omitted when nothing has been ingested yet.
  */
-export function system({ shopName, categories }: ShopContext): string {
-  if (categories.length === 0) return STATIC;
-
+export function system(
+  { shopName, categories }: ShopContext,
+  orderSnapshot: string,
+): string {
   const sorted = [...categories].sort((a, b) =>
     a.category.localeCompare(b.category),
   );
   const list = sorted.map((c) => `- ${c.category} (${c.count})`).join("\n");
   const name = shopName ? `Name: ${shopName}\n\n` : "";
+  const shopBlock =
+    categories.length === 0
+      ? ""
+      : `\n\n## This shop\n\n${name}Categories (item counts):\n${list}`;
 
-  return `${STATIC}
-
-## This shop
-
-${name}Categories (item counts):
-${list}`;
+  return `${STATIC}${shopBlock}\n\n${orderSnapshot}`;
 }

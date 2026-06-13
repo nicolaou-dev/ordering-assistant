@@ -6,15 +6,19 @@ import { getSettings } from "./settings";
 import { createDb, withShop } from "./db";
 import { guardQuery } from "./query_guard";
 import { createAnthropic } from "@ai-sdk/anthropic";
+import {
+  addItem,
+  emptyOrder,
+  renderOrderSnapshot,
+  type OrderState,
+} from "./order";
 import z from "zod";
-
-type OrderState = {};
 
 /** Max rows returned to the model from one query_data call. */
 const ROW_CAP = 50;
 
 export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
-  initialState: OrderState = {};
+  initialState: OrderState = emptyOrder;
 
   get shopId(): string {
     const [shopId, customer] = this.name.split(":");
@@ -64,6 +68,42 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       },
     });
 
+    const add_item = tool({
+      description:
+        "Add qty of a catalog product (by product_id) to the order. Stock, quantity merging and the total are handled for you; returns the updated order, or an error with nothing added.",
+      inputSchema: z.object({
+        product_id: z.string().describe("The product_id of a catalog product."),
+        qty: z.number().int().positive().describe("How many to add."),
+      }),
+      execute: async ({ product_id, qty }) => {
+        const [rows] = await withShop(db, this.shopId, [
+          db`SELECT product_id, name, price_minor, currency, in_stock
+             FROM products
+             WHERE product_id = ${product_id} AND deleted_at IS NULL`,
+        ]);
+        const product = rows[0];
+        if (!product)
+          return {
+            error: `Unknown product_id "${product_id}". Find the right one with query_data.`,
+          };
+        if (!product.in_stock)
+          return { error: `"${product.name}" is out of stock.` };
+
+        const next = addItem(
+          this.state,
+          {
+            product_id: product.product_id,
+            name: product.name,
+            unit_price_minor: product.price_minor,
+            currency: product.currency,
+          },
+          qty,
+        );
+        this.setState(next);
+        return next;
+      },
+    });
+
     // One scoped read per turn: shop name + categories with item counts. RLS
     // already limits both to this shop, so neither query needs a shop_id filter.
     const [nameRows, catRows] = await withShop(db, this.shopId, [
@@ -93,11 +133,12 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
 
     const { output: replies, response } = await generateText({
       model,
-      system: system({ shopName, categories }),
+      system: system({ shopName, categories }, renderOrderSnapshot(this.state)),
       messages,
       output,
       tools: {
         query_data,
+        add_item,
       },
       stopWhen: stepCountIs(5),
     });
