@@ -65,6 +65,17 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     return this.runModel();
   }
 
+  /**
+   * Return the draft order for the harness to render an order_summary reply.
+   * The model only signals "show it"; the channel adapter reads the stored
+   * state (items + fulfillment + total, all catalog-sourced at add_item time)
+   * and formats it, so nothing in the summary comes from model output.
+   */
+  @callable()
+  getOrderState(): OrderState {
+    return this.state;
+  }
+
   private async runModel(): Promise<Reply[]> {
     const output = Output.array({ element: Reply });
     const settings = getSettings(this.env);

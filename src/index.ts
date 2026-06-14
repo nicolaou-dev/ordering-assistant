@@ -4,6 +4,7 @@ import { OrderAgent } from "./agent";
 import { verifySignature } from "./verify";
 import z from "zod";
 import { createClient } from "./whatsapp/client";
+import { formatOrderSummary } from "./whatsapp/summary";
 import type { Address } from "./order";
 import { createAdminDb, createDb, withShop } from "./db";
 import { getAgentByName } from "agents";
@@ -106,6 +107,8 @@ app.post("/webhook/whatsapp", async (c) => {
     for (const reply of replies) {
       if (reply.type === "text") {
         await client.send(from, reply.body);
+      } else if (reply.type === "order_summary") {
+        await client.send(from, formatOrderSummary(await stub.getOrderState()));
       }
     }
   };
@@ -242,6 +245,16 @@ app.post("/debug/address", async (c) => {
   const stub = await getAgentByName(c.env.OrderAgent, instance);
   const replies = await stub.completeAddress(address);
   return c.json({ replies });
+});
+
+// Debug-only stand-in for the send-time render of an order_summary reply: shows
+// the hydrated, customer-facing summary the channel would send, so hydration is
+// testable without WhatsApp.
+app.post("/debug/summary", async (c) => {
+  const { instance } = await c.req.json<{ instance: string }>();
+  const stub = await getAgentByName(c.env.OrderAgent, instance);
+  const summary = formatOrderSummary(await stub.getOrderState());
+  return c.json({ summary });
 });
 
 app.post("/debug/send", async (c) => {

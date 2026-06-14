@@ -42,8 +42,8 @@ export const emptyOrder: OrderState = {
   fulfillment: { type: null, address: null },
 };
 
-/** One-line address for the snapshot. The model reads it; it never composes it. */
-function formatAddress(a: Address): string {
+/** One-line address. The model reads it in the snapshot; it never composes it. */
+export function formatAddress(a: Address): string {
   const parts = [a.line1, a.line2, a.city, a.postcode].filter(Boolean);
   return a.notes ? `${parts.join(", ")} (${a.notes})` : parts.join(", ");
 }
