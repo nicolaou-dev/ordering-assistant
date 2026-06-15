@@ -76,6 +76,19 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     return this.state;
   }
 
+  /**
+   * Operator escape hatch: clear this agent's session — order state and message
+   * history — so the next turn starts fresh. We clear in place rather than
+   * destroy() the Durable Object: destroy() ends with ctx.abort("destroyed"),
+   * which tears down the DO mid-RPC and fails the caller's request even though
+   * the wipe ran. Clearing state directly returns cleanly.
+   */
+  @callable()
+  reset(): void {
+    this.sql`DELETE FROM messages`;
+    this.setState(emptyOrder);
+  }
+
   private async runModel(): Promise<Reply[]> {
     const output = Output.array({ element: Reply });
     const settings = getSettings(this.env);

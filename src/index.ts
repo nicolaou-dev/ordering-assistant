@@ -287,6 +287,22 @@ app.post("/debug/summary", async (c) => {
   return c.json({ summary });
 });
 
+// Operator escape hatch: wipe an agent's Durable Object (order + history) so a
+// customer session can be reset. Guarded by ADMIN_TOKEN like /admin/catalog,
+// since it destroys state.
+app.post("/debug/reset", async (c) => {
+  const settings = getSettings(c.env);
+  const token = c.req.header("Authorization")?.slice(7);
+  if (token !== settings.ADMIN_TOKEN) {
+    return c.body(null, 401);
+  }
+
+  const { instance } = await c.req.json<{ instance: string }>();
+  const stub = await getAgentByName(c.env.OrderAgent, instance);
+  await stub.reset();
+  return c.body(null, 204);
+});
+
 app.post("/debug/send", async (c) => {
   const { to, body } = await c.req.json<{ to: string; body: string }>();
   const settings = getSettings(c.env);
