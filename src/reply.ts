@@ -10,9 +10,19 @@ const AddressRequest = z.object({ type: z.literal("address_request") });
 // total from the live catalog at send time, so the figure the customer confirms
 // can't drift from the source of truth.
 const OrderSummary = z.object({ type: z.literal("order_summary") });
+// A set of products to show the customer. Carries only catalog ids — no names,
+// prices or details: the harness looks each up in Postgres and renders it as an
+// image + caption (name, price, description) at send time, so the prices the
+// customer sees can never come from the model's tokens. Capped at 10 by the
+// prompt. One list (not a reply per product) groups them as a single set.
+const ProductList = z.object({
+  type: z.literal("product_list"),
+  product_ids: z.array(z.string()).min(1),
+});
 export const Reply = z.discriminatedUnion("type", [
   Text,
   AddressRequest,
   OrderSummary,
+  ProductList,
 ]);
 export type Reply = z.infer<typeof Reply>;
