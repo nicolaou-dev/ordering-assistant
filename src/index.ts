@@ -5,6 +5,7 @@ import { verifySignature } from "./verify";
 import z from "zod";
 import { createClient } from "./whatsapp/client";
 import { formatOrderSummary } from "./whatsapp/summary";
+import { formatProductCaption, type ProductRow } from "./whatsapp/product";
 import type { Address } from "./order";
 import { createAdminDb, createDb, withShop } from "./db";
 import { getAgentByName } from "agents";
@@ -104,11 +105,40 @@ app.post("/webhook/whatsapp", async (c) => {
     const stub = await getAgentByName(c.env.OrderAgent, sessionKey);
     const replies = await stub.runTurn(text.body);
 
+    const sql = createDb(settings);
+
     for (const reply of replies) {
       if (reply.type === "text") {
         await client.send(from, reply.body);
       } else if (reply.type === "order_summary") {
         await client.send(from, formatOrderSummary(await stub.getOrderState()));
+      } else if (reply.type === "product_list") {
+        // Hydrate each id from the catalog (scoped to this shop) and send it as a
+        // native image + caption, so prices/details come from Postgres, never the
+        // model's tokens. One atomic image+caption per product keeps the name,
+        // price and description attached to the image (separate messages can
+        // reorder in transit); no image_url falls back to a text message.
+        const [rows] = await withShop(sql, phone_number_id, [
+          sql`SELECT product_id, name, description, price_minor, currency, image_url
+              FROM products
+              WHERE product_id = ANY(${reply.product_ids}) AND deleted_at IS NULL`,
+        ]);
+        const byId = new Map(
+          (rows as ProductRow[]).map((r) => [r.product_id, r]),
+        );
+        for (const id of reply.product_ids) {
+          const product = byId.get(id);
+          if (!product) {
+            console.log("product_list: unknown product_id, skipping", { id });
+            continue;
+          }
+          const caption = formatProductCaption(product);
+          if (product.image_url) {
+            await client.sendImage(from, product.image_url, caption);
+          } else {
+            await client.send(from, caption);
+          }
+        }
       }
     }
   };
