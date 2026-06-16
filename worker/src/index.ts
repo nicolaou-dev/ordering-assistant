@@ -350,6 +350,42 @@ app.get("/debug/seller", async (c) => {
   return c.json({ shop_id: shopId });
 });
 
+// Seller reads their shop's orders, newest first — the read side the approve
+// flow acts on, until a dashboard exists. The Bearer token is the identity
+// (verifySellerToken -> shop_id), and withShop scopes both reads under RLS, so a
+// shop only ever sees its own orders. Optional ?status= narrows to one status
+// (e.g. the pending_approval queue); absent, all statuses are returned. Items
+// are the stored snapshot (never re-priced from the catalog); order_items'
+// policy scopes them through their parent order, so the unfiltered item read
+// already returns only this shop's lines, which we group onto their orders.
+app.get("/orders", async (c) => {
+  const shopId = await sellerShopId(c);
+  const status = c.req.query("status");
+  const sql = createDb(getSettings(c.env));
+
+  const [orders, items] = await withShop(sql, shopId, [
+    status
+      ? sql`SELECT order_id, status, customer_phone, fulfillment_type,
+                   total_minor, currency, created_at
+            FROM orders WHERE status = ${status} ORDER BY created_at DESC`
+      : sql`SELECT order_id, status, customer_phone, fulfillment_type,
+                   total_minor, currency, created_at
+            FROM orders ORDER BY created_at DESC`,
+    sql`SELECT order_id, qty, name, unit_price_minor, line_total_minor
+        FROM order_items`,
+  ]);
+
+  const itemsByOrder = new Map<string, Record<string, any>[]>();
+  for (const item of items) {
+    const { order_id, ...line } = item;
+    (itemsByOrder.get(order_id) ?? itemsByOrder.set(order_id, []).get(order_id)!).push(line);
+  }
+
+  return c.json({
+    orders: orders.map((o) => ({ ...o, items: itemsByOrder.get(o.order_id) ?? [] })),
+  });
+});
+
 // Seller approves one pending order. The Bearer token is the identity: it
 // resolves to the shop_id (never the path), and withShop scopes the write under
 // RLS so a token for shop A can't touch shop B's order — that order is simply
