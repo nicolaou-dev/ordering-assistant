@@ -11,8 +11,10 @@ export type OrderItem = {
   currency: string;
 };
 
-// A delivery address. The model can see the whole address but never edits it:
-// it's written by a completed form, never by a model tool.
+// A delivery address. The model parses it from what the customer typed and
+// writes it with the set_address tool, then reads it back to confirm. The
+// customer is the source of truth for their own address, so model parsing is
+// safe — unlike prices, where the catalog is authoritative.
 export type Address = {
   line1: string;
   line2?: string;
@@ -22,7 +24,7 @@ export type Address = {
 };
 
 // How the order is handed over. type is null until the customer chooses;
-// address stays null until a completed form writes it (delivery only).
+// address stays null until set_address writes it (delivery only).
 export type Fulfillment = {
   type: "pickup" | "delivery" | null;
   address: Address | null;
@@ -42,7 +44,7 @@ export const emptyOrder: OrderState = {
   fulfillment: { type: null, address: null },
 };
 
-/** One-line address. The model reads it in the snapshot; it never composes it. */
+/** One-line address, for the snapshot and the customer-facing summary. */
 export function formatAddress(a: Address): string {
   const parts = [a.line1, a.line2, a.city, a.postcode].filter(Boolean);
   return a.notes ? `${parts.join(", ")} (${a.notes})` : parts.join(", ");
@@ -61,9 +63,8 @@ export function setFulfillment(
 }
 
 /**
- * Attach a completed delivery address to the order, returning the next state.
- * Pure: a completed form supplies the fields; the model never parses or
- * composes them, and this never collects them itself.
+ * Attach a delivery address to the order, returning the next state. Pure: the
+ * caller (set_address tool) has already validated the required fields.
  */
 export function setAddress(state: OrderState, address: Address): OrderState {
   return { ...state, fulfillment: { ...state.fulfillment, address } };

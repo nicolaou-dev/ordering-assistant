@@ -51,23 +51,8 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   }
 
   /**
-   * A completed delivery-address form came back. Writing the address is a
-   * deterministic state edit, never an LLM turn: we set it directly, drop a
-   * brief marker in history so the model knows the form returned (it never sees
-   * or parses the fields — they're in the order snapshot), then run one turn so
-   * it reacts to the new state and continues the loop.
-   */
-  @callable()
-  async completeAddress(address: Address): Promise<Reply[]> {
-    this.setState(setAddress(this.state, address));
-    this
-      .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify("[The customer submitted their delivery address. It's in the order snapshot.]")})`;
-    return this.runModel();
-  }
-
-  /**
-   * The customer tapped Checkout in the storefront. Like completeAddress this is
-   * a deterministic trigger, not a typed message: drop an internal marker so the
+   * The customer tapped Checkout in the storefront. A deterministic trigger,
+   * not a typed message: drop an internal marker so the
    * model shows the order summary and asks them to confirm, then run one turn.
    * The marker is context for the model, never sent to the customer.
    */
@@ -155,6 +140,34 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     return next;
   }
 
+  /**
+   * Validate and save the delivery address the model parsed from the customer's
+   * message. line1, city and postcode are required; missing ones come back as a
+   * helpful error so the model asks for them rather than saving a partial
+   * address. Trims fields and drops empty optionals. Returns the saved address
+   * for the model to read back to the customer.
+   */
+  setAddress(fields: Partial<Address>): Address | { error: string } {
+    const trimmed = (v: string | undefined) => v?.trim() || undefined;
+    const required = { line1: "street address", city: "city", postcode: "postcode" } as const;
+    const missing = Object.entries(required)
+      .filter(([k]) => !trimmed(fields[k as keyof Address]))
+      .map(([, label]) => label);
+    if (missing.length)
+      return {
+        error: `Address not saved — missing the ${missing.join(", ")}. Ask the customer for the missing part(s), then call set_address again.`,
+      };
+    const address: Address = {
+      line1: trimmed(fields.line1)!,
+      city: trimmed(fields.city)!,
+      postcode: trimmed(fields.postcode)!,
+      ...(trimmed(fields.line2) && { line2: trimmed(fields.line2) }),
+      ...(trimmed(fields.notes) && { notes: trimmed(fields.notes) }),
+    };
+    this.setState(setAddress(this.state, address));
+    return address;
+  }
+
   private async runModel(): Promise<Reply[]> {
     const output = Output.array({ element: Reply });
     const settings = getSettings(this.env);
@@ -220,6 +233,19 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       },
     });
 
+    const set_address = tool({
+      description:
+        "Save the customer's delivery address, parsed into parts from what they typed. line1 (street and number), city and postcode are required; line2 and notes (delivery instructions) are optional. Returns the saved address to read back for confirmation, or an error naming what's missing so you can ask the customer for it. Only for delivery orders.",
+      inputSchema: z.object({
+        line1: z.string().optional().describe("Street address and number."),
+        line2: z.string().optional().describe("Flat, unit or second line."),
+        city: z.string().optional().describe("City or town."),
+        postcode: z.string().optional().describe("Postal / ZIP code."),
+        notes: z.string().optional().describe("Delivery instructions."),
+      }),
+      execute: (fields) => this.setAddress(fields),
+    });
+
     // One scoped read per turn: shop name + categories with item counts. RLS
     // already limits both to this shop, so neither query needs a shop_id filter.
     const [nameRows, catRows] = await withShop(db, this.shopId, [
@@ -254,6 +280,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
         add_item,
         remove_item,
         set_fulfillment,
+        set_address,
       },
       stopWhen: stepCountIs(5),
     });
