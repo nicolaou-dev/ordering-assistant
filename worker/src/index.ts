@@ -1,5 +1,6 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
+import { HTTPException } from "hono/http-exception";
 import { getSettings } from "./settings";
 import { OrderAgent } from "./agent";
 import { verifySignature } from "./verify";
@@ -12,6 +13,7 @@ import { createAdminDb, createDb, withShop, type Sql } from "./db";
 import type { Reply } from "./reply";
 import { getAgentByName } from "agents";
 import * as XLSX from "xlsx";
+import { mintSellerToken, verifySellerToken } from "./seller_token";
 
 export { OrderAgent };
 
@@ -46,7 +48,9 @@ async function sendReplies(replies: Reply[], ctx: SendCtx): Promise<void> {
               FROM products
               WHERE product_id = ANY(${reply.product_ids}) AND deleted_at IS NULL`,
         ]);
-        const byId = new Map((rows as ProductRow[]).map((r) => [r.product_id, r]));
+        const byId = new Map(
+          (rows as ProductRow[]).map((r) => [r.product_id, r]),
+        );
         for (const id of reply.product_ids) {
           const product = byId.get(id);
           if (!product) {
@@ -213,6 +217,22 @@ async function productId(shopId: string, category: string, name: string) {
     .join("");
 }
 
+// Authenticate a seller request by its Bearer token, returning the shop_id it
+// carries (the shop's phone_number_id). Throws 401 on a missing, invalid, or
+// expired token. The seller order endpoints derive shop_id from this — never
+// from the path or ADMIN_TOKEN.
+async function sellerShopId(
+  c: Context<{ Bindings: CloudflareBindings }>,
+): Promise<string> {
+  const settings = getSettings(c.env);
+  const token = c.req.header("Authorization")?.slice(7);
+  const claims = token
+    ? await verifySellerToken(token, settings.WHATSAPP_APP_SECRET)
+    : null;
+  if (!claims) throw new HTTPException(401, { message: "invalid seller token" });
+  return claims.phone_number_id;
+}
+
 app.post("/admin/catalog/:shop_id", async (c) => {
   const settings = getSettings(c.env);
   const bearer = c.req.header("Authorization");
@@ -302,6 +322,32 @@ app.post("/admin/shops", async (c) => {
     ON CONFLICT (phone_number_id) DO UPDATE SET name = excluded.name
     RETURNING phone_number_id, name`;
   return c.json(shop);
+});
+
+// Bootstrap minting so the seller order endpoints are testable before OTP login
+// exists. ADMIN_TOKEN-guarded; the shop_id (the shop's phone_number_id) is the
+// path param, and the minted token verifies back to it.
+app.post("/admin/shops/:shop_id/seller-token", async (c) => {
+  const settings = getSettings(c.env);
+  const token = c.req.header("Authorization")?.slice(7);
+  if (token !== settings.ADMIN_TOKEN) {
+    return c.body(null, 401);
+  }
+
+  const shopId = c.req.param("shop_id");
+  const sellerToken = await mintSellerToken(
+    shopId,
+    settings.WHATSAPP_APP_SECRET,
+  );
+  return c.json({ token: sellerToken });
+});
+
+// Exercise the seller Bearer auth: echoes back the shop_id a token resolves to,
+// or 401. Lets us manually verify a minted seller token before the real seller
+// endpoints (approve / list orders) exist.
+app.get("/debug/seller", async (c) => {
+  const shopId = await sellerShopId(c);
+  return c.json({ shop_id: shopId });
 });
 
 app.get("/debug/rls/:shop_id", async (c) => {
