@@ -75,6 +75,21 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   }
 
   /**
+   * The shop approved this customer's submitted order. Like checkout(), a
+   * deterministic trigger rather than a typed message: drop an internal marker
+   * so the model tells the customer their order was approved, then run one turn.
+   * The submitted order lives in Neon (the DO draft was cleared at submit), so
+   * the model speaks from the conversation history, not the draft state. The
+   * marker is context for the model, never sent to the customer.
+   */
+  @callable()
+  async notifyApproved(): Promise<Reply[]> {
+    this
+      .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify("[The shop approved the customer's order. Let them know it's confirmed and being prepared.]")})`;
+    return this.runModel();
+  }
+
+  /**
    * Return the draft order for the harness to render an order_summary reply.
    * The model only signals "show it"; the channel adapter reads the stored
    * state (items + fulfillment + total, all catalog-sourced at add_item time)

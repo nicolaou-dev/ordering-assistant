@@ -393,18 +393,36 @@ app.get("/orders", async (c) => {
 // pending_approval -> approved happens; any other status is left untouched and
 // reported back (409) so the seller knows it was already handled.
 app.post("/orders/:order_id/approve", async (c) => {
+  const settings = getSettings(c.env);
   const shopId = await sellerShopId(c);
   const orderId = c.req.param("order_id");
-  const sql = createDb(getSettings(c.env));
+  const sql = createDb(settings);
 
   const [approved, current] = await withShop(sql, shopId, [
     sql`UPDATE orders SET status = 'approved', updated_at = now()
         WHERE order_id = ${orderId} AND status = 'pending_approval'
-        RETURNING order_id, status`,
+        RETURNING order_id, status, customer_phone`,
     sql`SELECT status FROM orders WHERE order_id = ${orderId}`,
   ]);
 
   if (approved.length > 0) {
+    // Let the customer hear it from the agent, not a canned template: signal
+    // their OrderAgent (keyed by shop + customer phone) to author a turn, then
+    // push the replies over WhatsApp. The send is best-effort — the order is
+    // already approved, so a failed notification must not fail the seller's
+    // request — but we await it so the seller's 200 reflects a sent message.
+    const customer = approved[0].customer_phone as string;
+    const stub = await getAgentByName(c.env.OrderAgent, `${shopId}:${customer}`);
+    const replies = await stub.notifyApproved();
+    await sendReplies(replies, {
+      client: createClient(settings),
+      to: customer,
+      sql,
+      shopId,
+      orderSummary: async () => formatOrderSummary(await stub.getOrderState()),
+      menuLink: async () =>
+        `${settings.STOREFRONT_URL}/?t=${await mintCartToken(shopId, customer, settings.WHATSAPP_APP_SECRET)}`,
+    });
     return c.json({ order_id: orderId, status: "approved" });
   }
   // No transition: either the order isn't visible to this shop (RLS → no row →
