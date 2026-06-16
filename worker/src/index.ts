@@ -350,6 +350,35 @@ app.get("/debug/seller", async (c) => {
   return c.json({ shop_id: shopId });
 });
 
+// Seller approves one pending order. The Bearer token is the identity: it
+// resolves to the shop_id (never the path), and withShop scopes the write under
+// RLS so a token for shop A can't touch shop B's order — that order is simply
+// invisible, so it reads as 404. The UPDATE is guarded on status so only
+// pending_approval -> approved happens; any other status is left untouched and
+// reported back (409) so the seller knows it was already handled.
+app.post("/orders/:order_id/approve", async (c) => {
+  const shopId = await sellerShopId(c);
+  const orderId = c.req.param("order_id");
+  const sql = createDb(getSettings(c.env));
+
+  const [approved, current] = await withShop(sql, shopId, [
+    sql`UPDATE orders SET status = 'approved', updated_at = now()
+        WHERE order_id = ${orderId} AND status = 'pending_approval'
+        RETURNING order_id, status`,
+    sql`SELECT status FROM orders WHERE order_id = ${orderId}`,
+  ]);
+
+  if (approved.length > 0) {
+    return c.json({ order_id: orderId, status: "approved" });
+  }
+  // No transition: either the order isn't visible to this shop (RLS → no row →
+  // 404) or it's in some other status (409 with that status, unchanged).
+  if (current.length === 0) {
+    return c.json({ error: "order not found" }, 404);
+  }
+  return c.json({ order_id: orderId, status: current[0].status }, 409);
+});
+
 app.get("/debug/rls/:shop_id", async (c) => {
   const settings = getSettings(c.env);
   const sql = createDb(settings);
