@@ -1,7 +1,9 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { getSettings } from "./settings";
 import { OrderAgent } from "./agent";
 import { verifySignature } from "./verify";
+import { verifyCartToken } from "./cart_token";
 import z from "zod";
 import { createClient } from "./whatsapp/client";
 import { formatOrderSummary } from "./whatsapp/summary";
@@ -14,6 +16,10 @@ import * as XLSX from "xlsx";
 export { OrderAgent };
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
+
+// The storefront calls /cart from a different origin (Cloudflare Pages). Auth is
+// the signed token in the body, not a cookie, so an open origin is safe.
+app.use("/cart/*", cors());
 
 app.get("/healthz", (c) => {
   return c.json({ ok: true, ts: new Date().toISOString() });
@@ -301,6 +307,56 @@ app.post("/debug/reset", async (c) => {
   const stub = await getAgentByName(c.env.OrderAgent, instance);
   await stub.reset();
   return c.body(null, 204);
+});
+
+// Storefront cart edits. The signed token (minted into the storefront link)
+// identifies which OrderAgent to edit; verify it, derive the agent's name
+// `${shopId}:${customer}`, then call the same addItem/removeItem the model's
+// tools use. Returns the cart (items + total) for the page to render.
+const CartBody = z.object({
+  token: z.string(),
+  product_id: z.string(),
+  qty: z.number().int().positive().default(1),
+});
+
+app.post("/cart/add", async (c) => {
+  const settings = getSettings(c.env);
+  const parsed = CartBody.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "bad request" }, 400);
+
+  const claims = await verifyCartToken(
+    parsed.data.token,
+    settings.WHATSAPP_APP_SECRET,
+  );
+  if (!claims) return c.json({ error: "invalid token" }, 401);
+
+  const stub = await getAgentByName(
+    c.env.OrderAgent,
+    `${claims.shopId}:${claims.customer}`,
+  );
+  const result = await stub.addItem(parsed.data.product_id, parsed.data.qty);
+  if ("error" in result) return c.json(result, 409);
+  return c.json({ items: result.items, total_minor: result.total_minor });
+});
+
+app.post("/cart/remove", async (c) => {
+  const settings = getSettings(c.env);
+  const parsed = CartBody.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "bad request" }, 400);
+
+  const claims = await verifyCartToken(
+    parsed.data.token,
+    settings.WHATSAPP_APP_SECRET,
+  );
+  if (!claims) return c.json({ error: "invalid token" }, 401);
+
+  const stub = await getAgentByName(
+    c.env.OrderAgent,
+    `${claims.shopId}:${claims.customer}`,
+  );
+  const result = await stub.removeItem(parsed.data.product_id, parsed.data.qty);
+  if ("error" in result) return c.json(result, 409);
+  return c.json({ items: result.items, total_minor: result.total_minor });
 });
 
 app.post("/debug/send", async (c) => {

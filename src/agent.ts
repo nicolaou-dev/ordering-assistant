@@ -7,8 +7,8 @@ import { createDb, withShop } from "./db";
 import { guardQuery } from "./query_guard";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import {
-  addItem,
-  removeItem,
+  addItem as addItemToOrder,
+  removeItem as removeItemFromOrder,
   setFulfillment,
   setAddress,
   emptyOrder,
@@ -89,6 +89,59 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     this.setState(emptyOrder);
   }
 
+  /**
+   * Add qty of a catalog product to the draft, scoped to this shop. The shared
+   * core for both the model's add_item tool and the storefront's /cart endpoint,
+   * so the stock check, quantity merge and total stay identical on both paths.
+   * Returns the next order state, or an error with nothing changed.
+   */
+  @callable()
+  async addItem(
+    product_id: string,
+    qty: number,
+  ): Promise<OrderState | { error: string }> {
+    const db = createDb(getSettings(this.env));
+    const [rows] = await withShop(db, this.shopId, [
+      db`SELECT product_id, name, price_minor, currency, in_stock
+         FROM products
+         WHERE product_id = ${product_id} AND deleted_at IS NULL`,
+    ]);
+    const product = rows[0];
+    if (!product)
+      return {
+        error: `Unknown product_id "${product_id}". Find the right one with query_data.`,
+      };
+    if (!product.in_stock) return { error: `"${product.name}" is out of stock.` };
+
+    const next = addItemToOrder(
+      this.state,
+      {
+        product_id: product.product_id,
+        name: product.name,
+        unit_price_minor: product.price_minor,
+        currency: product.currency,
+      },
+      qty,
+    );
+    this.setState(next);
+    return next;
+  }
+
+  /**
+   * Remove qty of a line already in the draft. Shared core for the remove_item
+   * tool and the /cart endpoint. Returns the next state, or an error.
+   */
+  @callable()
+  removeItem(product_id: string, qty: number): OrderState | { error: string } {
+    if (!this.state.items.some((i) => i.product_id === product_id))
+      return {
+        error: `product_id "${product_id}" is not in the order. Check the current order snapshot.`,
+      };
+    const next = removeItemFromOrder(this.state, product_id, qty);
+    this.setState(next);
+    return next;
+  }
+
   private async runModel(): Promise<Reply[]> {
     const output = Output.array({ element: Reply });
     const settings = getSettings(this.env);
@@ -124,33 +177,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
         product_id: z.string().describe("The product_id of a catalog product."),
         qty: z.number().int().positive().describe("How many to add."),
       }),
-      execute: async ({ product_id, qty }) => {
-        const [rows] = await withShop(db, this.shopId, [
-          db`SELECT product_id, name, price_minor, currency, in_stock
-             FROM products
-             WHERE product_id = ${product_id} AND deleted_at IS NULL`,
-        ]);
-        const product = rows[0];
-        if (!product)
-          return {
-            error: `Unknown product_id "${product_id}". Find the right one with query_data.`,
-          };
-        if (!product.in_stock)
-          return { error: `"${product.name}" is out of stock.` };
-
-        const next = addItem(
-          this.state,
-          {
-            product_id: product.product_id,
-            name: product.name,
-            unit_price_minor: product.price_minor,
-            currency: product.currency,
-          },
-          qty,
-        );
-        this.setState(next);
-        return next;
-      },
+      execute: ({ product_id, qty }) => this.addItem(product_id, qty),
     });
 
     const remove_item = tool({
@@ -162,16 +189,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
           .describe("The product_id of a line already in the order."),
         qty: z.number().int().positive().describe("How many to remove."),
       }),
-      execute: async ({ product_id, qty }) => {
-        if (!this.state.items.some((i) => i.product_id === product_id))
-          return {
-            error: `product_id "${product_id}" is not in the order. Check the current order snapshot.`,
-          };
-
-        const next = removeItem(this.state, product_id, qty);
-        this.setState(next);
-        return next;
-      },
+      execute: ({ product_id, qty }) => this.removeItem(product_id, qty),
     });
 
     const set_fulfillment = tool({
