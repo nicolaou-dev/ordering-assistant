@@ -319,6 +319,25 @@ const CartBody = z.object({
   qty: z.number().int().positive().default(1),
 });
 
+// Read the current cart so the storefront can hydrate on load (reload, or
+// arriving from chat with items already in the draft). Reuses getOrderState;
+// the token is in the query string since GET has no body.
+app.get("/cart/state", async (c) => {
+  const settings = getSettings(c.env);
+  const token = c.req.query("token");
+  if (!token) return c.json({ error: "bad request" }, 400);
+
+  const claims = await verifyCartToken(token, settings.WHATSAPP_APP_SECRET);
+  if (!claims) return c.json({ error: "invalid token" }, 401);
+
+  const stub = await getAgentByName(
+    c.env.OrderAgent,
+    `${claims.shopId}:${claims.customer}`,
+  );
+  const state = await stub.getOrderState();
+  return c.json({ items: state.items, total_minor: state.total_minor });
+});
+
 app.post("/cart/add", async (c) => {
   const settings = getSettings(c.env);
   const parsed = CartBody.safeParse(await c.req.json().catch(() => null));
