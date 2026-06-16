@@ -15,14 +15,19 @@ One shop is seeded in Neon for local development: **Bake N Take**.
 - Dialable WhatsApp number +1 (555) 652-3510 → E.164 `15556523510`. A Meta
   **test number** (limited recipients; shows "test number", no profile
   name/picture by default). Used for the storefront `wa.me` link (`WA_NUMBER`).
-- 63 products seeded from `tests/fixtures/bake-n-take.xlsx`. Set the shop name via
-  `POST /admin/shops`.
+- 63 products seeded from `worker/tests/fixtures/bake-n-take.xlsx`. Set the shop
+  name via `POST /admin/shops`.
 
-## Use the project's scripts
+## Monorepo layout & scripts
 
-Don't invoke tools ad-hoc (`npx tsc`, raw binaries). Check `package.json`
-`scripts` and run the project's own command (`pnpm <script>`) — it carries the
-right flags and config.
+pnpm workspace with two packages: `worker/` (the Cloudflare Worker — API, agent,
+DB) and `storefront/` (the Astro storefront). Each owns its own config, deps and
+scripts.
+
+Don't invoke tools ad-hoc (`npx tsc`, raw binaries). Run the package's own
+script: `pnpm worker <script>` (e.g. `pnpm worker dev`, `pnpm worker deploy`,
+`pnpm worker db:migrate`) or `pnpm storefront <script>` (e.g. `pnpm storefront
+build`). `pnpm typecheck` runs across both. Each carries the right flags and config.
 
 ## Check current versions
 
