@@ -1,0 +1,78 @@
+---
+import { Image } from "astro:assets";
+import { loadCatalog } from "../lib/catalog";
+import { money } from "../lib/money";
+import CartControl from "../components/CartControl.tsx";
+import CartBar from "../components/CartBar.tsx";
+import TokenNotice from "../components/TokenNotice.tsx";
+import "../styles/global.css";
+
+const categories = await loadCatalog();
+const workerUrl = import.meta.env.WORKER_URL ?? "";
+const waNumber = import.meta.env.WA_NUMBER ?? "";
+const shopName = import.meta.env.SHOP_NAME ?? "Menu";
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>{shopName}</title>
+	</head>
+	<body class="bg-neutral-50 text-neutral-900">
+		<div class="mx-auto max-w-2xl px-4 pb-28">
+			<header class="py-6">
+				<h1 class="text-2xl font-bold tracking-tight">{shopName}</h1>
+			</header>
+
+			<TokenNotice client:load />
+
+			{
+				categories.map((cat) => (
+					<section class="mb-8">
+						<h2 class="mb-3 text-lg font-semibold">{cat.name}</h2>
+						<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+							{cat.products.map((p) => (
+								<article class="flex gap-3 rounded-xl border border-neutral-200 bg-white p-3">
+									{p.image_url && (
+										<Image
+											src={p.image_url}
+											alt={p.name}
+											width={320}
+											height={180}
+											loading="lazy"
+											class="h-20 w-20 shrink-0 rounded-lg object-cover"
+										/>
+									)}
+									<div class="flex min-w-0 flex-1 flex-col">
+										<h3 class="truncate text-sm font-medium">{p.name}</h3>
+										{p.description && (
+											<p class="mt-0.5 line-clamp-2 text-xs text-neutral-500">
+												{p.description}
+											</p>
+										)}
+										<div class="mt-auto flex items-center justify-between pt-2">
+											<span class="text-sm font-semibold">
+												{money(p.price_minor, p.currency)}
+											</span>
+											<CartControl
+												client:visible
+												productId={p.product_id}
+												name={p.name}
+												workerUrl={workerUrl}
+												soldOut={!p.in_stock}
+											/>
+										</div>
+									</div>
+								</article>
+							))}
+						</div>
+					</section>
+				))
+			}
+		</div>
+
+		<CartBar client:load workerUrl={workerUrl} waNumber={waNumber} />
+	</body>
+</html>
