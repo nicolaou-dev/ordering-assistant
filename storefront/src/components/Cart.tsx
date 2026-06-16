@@ -5,6 +5,7 @@ import {
   $cart,
   $error,
   $pending,
+  checkout,
   hydrate,
   mutate,
   type CartItem,
@@ -23,6 +24,7 @@ export default function Cart({
   const cart = useStore($cart);
   const error = useStore($error);
   const [open, setOpen] = useState(false);
+  const [checkingOut, setCheckingOut] = useState(false);
 
   useEffect(() => {
     hydrate(workerUrl);
@@ -37,9 +39,18 @@ export default function Cart({
   if (count === 0) return null;
 
   const currency = cart.items[0]?.currency ?? "EUR";
-  const checkoutHref = `https://wa.me/${waNumber}?text=${encodeURIComponent(
-    "I'm ready to check out my order",
-  )}`;
+
+  async function onCheckout() {
+    setCheckingOut(true);
+    $error.set(null);
+    try {
+      await checkout(workerUrl);
+      window.location.href = `https://wa.me/${waNumber}`;
+    } catch (e) {
+      $error.set(e instanceof Error ? e.message : "Checkout failed");
+      setCheckingOut(false);
+    }
+  }
 
   return (
     <>
@@ -77,18 +88,21 @@ export default function Cart({
 
       <div className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-2xl">
         {open ? (
-          <a
-            href={checkoutHref}
-            className="flex w-full items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-white shadow-lg"
+          <button
+            onClick={onCheckout}
+            disabled={checkingOut}
+            className="flex w-full items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-white shadow-lg disabled:opacity-60"
           >
             <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-white/25 px-1.5 text-sm font-bold">
               {count}
             </span>
-            <span className="text-sm font-semibold">Go to checkout</span>
+            <span className="text-sm font-semibold">
+              {checkingOut ? "Sending…" : "Go to checkout"}
+            </span>
             <span className="ml-auto text-sm font-semibold">
               {money(cart.total_minor, currency)}
             </span>
-          </a>
+          </button>
         ) : (
           <button
             onClick={() => setOpen(true)}

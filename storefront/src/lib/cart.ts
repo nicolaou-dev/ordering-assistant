@@ -40,6 +40,19 @@ export async function hydrate(workerUrl: string): Promise<void> {
   }
 }
 
+// Trigger the agent to push the order summary to the customer's WhatsApp. The
+// caller redirects to the chat on success; throws so it can show an error and not.
+export async function checkout(workerUrl: string): Promise<void> {
+  const token = getToken();
+  if (!token) throw new Error("missing token");
+  const res = await fetch(`${workerUrl}/cart/checkout`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+  if (!res.ok) throw new Error(`checkout failed (${res.status})`);
+}
+
 export async function mutate(
   workerUrl: string,
   product_id: string,

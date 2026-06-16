@@ -9,11 +9,67 @@ import { createClient } from "./whatsapp/client";
 import { formatOrderSummary } from "./whatsapp/summary";
 import { formatProductCaption, type ProductRow } from "./whatsapp/product";
 import type { Address } from "./order";
-import { createAdminDb, createDb, withShop } from "./db";
+import { createAdminDb, createDb, withShop, type Sql } from "./db";
+import type { Reply } from "./reply";
 import { getAgentByName } from "agents";
 import * as XLSX from "xlsx";
 
 export { OrderAgent };
+
+// Deliver the agent's replies to one customer over WhatsApp. Shared by the
+// inbound webhook and the storefront checkout endpoint so both render replies
+// identically (text / hydrated order summary / product images). Send failures
+// are logged, not thrown — one failed message must not drop the rest.
+type SendCtx = {
+  client: ReturnType<typeof createClient>;
+  to: string;
+  sql: Sql;
+  shopId: string;
+  orderSummary: () => Promise<string>;
+};
+
+async function sendReplies(replies: Reply[], ctx: SendCtx): Promise<void> {
+  const { client, to, sql, shopId, orderSummary } = ctx;
+  for (const reply of replies) {
+    try {
+      if (reply.type === "text") {
+        await client.send(to, reply.body);
+      } else if (reply.type === "order_summary") {
+        await client.send(to, await orderSummary());
+      } else if (reply.type === "product_list") {
+        // Hydrate each id from the catalog (scoped to this shop) and send it as a
+        // native image + caption, so prices/details come from Postgres, never the
+        // model's tokens. One atomic image+caption per product keeps the name,
+        // price and description attached to the image; no image_url falls back to text.
+        const [rows] = await withShop(sql, shopId, [
+          sql`SELECT product_id, name, description, price_minor, currency, image_url
+              FROM products
+              WHERE product_id = ANY(${reply.product_ids}) AND deleted_at IS NULL`,
+        ]);
+        const byId = new Map((rows as ProductRow[]).map((r) => [r.product_id, r]));
+        for (const id of reply.product_ids) {
+          const product = byId.get(id);
+          if (!product) {
+            console.log("product_list: unknown product_id, skipping", { id });
+            continue;
+          }
+          const caption = formatProductCaption(product);
+          if (product.image_url) {
+            await client.sendImage(to, product.image_url, caption);
+          } else {
+            await client.send(to, caption);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("sendReplies: failed to send a reply", {
+        to,
+        type: reply.type,
+        error: (e as Error).message,
+      });
+    }
+  }
+}
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -111,42 +167,13 @@ app.post("/webhook/whatsapp", async (c) => {
     const stub = await getAgentByName(c.env.OrderAgent, sessionKey);
     const replies = await stub.runTurn(text.body);
 
-    const sql = createDb(settings);
-
-    for (const reply of replies) {
-      if (reply.type === "text") {
-        await client.send(from, reply.body);
-      } else if (reply.type === "order_summary") {
-        await client.send(from, formatOrderSummary(await stub.getOrderState()));
-      } else if (reply.type === "product_list") {
-        // Hydrate each id from the catalog (scoped to this shop) and send it as a
-        // native image + caption, so prices/details come from Postgres, never the
-        // model's tokens. One atomic image+caption per product keeps the name,
-        // price and description attached to the image (separate messages can
-        // reorder in transit); no image_url falls back to a text message.
-        const [rows] = await withShop(sql, phone_number_id, [
-          sql`SELECT product_id, name, description, price_minor, currency, image_url
-              FROM products
-              WHERE product_id = ANY(${reply.product_ids}) AND deleted_at IS NULL`,
-        ]);
-        const byId = new Map(
-          (rows as ProductRow[]).map((r) => [r.product_id, r]),
-        );
-        for (const id of reply.product_ids) {
-          const product = byId.get(id);
-          if (!product) {
-            console.log("product_list: unknown product_id, skipping", { id });
-            continue;
-          }
-          const caption = formatProductCaption(product);
-          if (product.image_url) {
-            await client.sendImage(from, product.image_url, caption);
-          } else {
-            await client.send(from, caption);
-          }
-        }
-      }
-    }
+    await sendReplies(replies, {
+      client,
+      to: from,
+      sql: createDb(settings),
+      shopId: phone_number_id,
+      orderSummary: async () => formatOrderSummary(await stub.getOrderState()),
+    });
   };
 
   c.executionCtx.waitUntil(handleInbound());
@@ -405,6 +432,45 @@ app.post("/cart/remove", async (c) => {
   const result = await stub.removeItem(parsed.data.product_id, parsed.data.qty);
   if ("error" in result) return c.json(result, 409);
   return c.json({ items: result.items, total_minor: result.total_minor });
+});
+
+// Storefront checkout: run an agent turn (triggered by an internal marker, not a
+// visible customer message) so it produces the order summary, push the replies
+// to the customer over WhatsApp, then the page redirects to the chat — the
+// summary is already waiting when they arrive. A failed turn returns an error so
+// the page can show it and not redirect; failed sends are logged best-effort.
+app.post("/cart/checkout", async (c) => {
+  const settings = getSettings(c.env);
+  const { token } = await c.req
+    .json<{ token?: string }>()
+    .catch(() => ({ token: undefined }));
+  if (!token) return c.json({ error: "bad request" }, 400);
+
+  const claims = await verifyCartToken(token, settings.WHATSAPP_APP_SECRET);
+  if (!claims) return c.json({ error: "invalid token" }, 401);
+
+  const stub = await getAgentByName(
+    c.env.OrderAgent,
+    `${claims.shopId}:${claims.customer}`,
+  );
+
+  let replies;
+  try {
+    replies = await stub.checkout();
+  } catch (e) {
+    console.error("checkout turn failed", { error: (e as Error).message });
+    return c.json({ error: "checkout failed" }, 502);
+  }
+
+  await sendReplies(replies, {
+    client: createClient(settings),
+    to: claims.customer,
+    sql: createDb(settings),
+    shopId: claims.shopId,
+    orderSummary: async () => formatOrderSummary(await stub.getOrderState()),
+  });
+
+  return c.body(null, 204);
 });
 
 app.post("/debug/send", async (c) => {

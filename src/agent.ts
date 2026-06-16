@@ -66,6 +66,19 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   }
 
   /**
+   * The customer tapped Checkout in the storefront. Like completeAddress this is
+   * a deterministic trigger, not a typed message: drop an internal marker so the
+   * model shows the order summary and asks them to confirm, then run one turn.
+   * The marker is context for the model, never sent to the customer.
+   */
+  @callable()
+  async checkout(): Promise<Reply[]> {
+    this
+      .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify("[The customer tapped Checkout in the storefront. Show the order summary and ask them to confirm.]")})`;
+    return this.runModel();
+  }
+
+  /**
    * Return the draft order for the harness to render an order_summary reply.
    * The model only signals "show it"; the channel adapter reads the stored
    * state (items + fulfillment + total, all catalog-sourced at add_item time)
