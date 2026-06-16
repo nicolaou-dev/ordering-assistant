@@ -36,12 +36,18 @@ export type OrderState = {
   // tickets read the total without re-summing.
   total_minor: number;
   fulfillment: Fulfillment;
+  // Idempotency seed for submit_order: assigned when the draft gets its first
+  // item, cleared when the order is placed. Combined with the DO name it forms
+  // a key stable across retries of the same draft, so a double submit collapses
+  // to one order via orders.idempotency_key UNIQUE.
+  draftId: string | null;
 };
 
 export const emptyOrder: OrderState = {
   items: [],
   total_minor: 0,
   fulfillment: { type: null, address: null },
+  draftId: null,
 };
 
 /** One-line address, for the snapshot and the customer-facing summary. */

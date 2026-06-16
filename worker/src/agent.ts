@@ -34,6 +34,17 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     return shopId;
   }
 
+  /** The customer's phone number — the second half of the DO name. */
+  get customer(): string {
+    const [shopId, customer] = this.name.split(":");
+    if (!shopId || !customer) {
+      throw new Error(
+        `OrderAgent name is not "<phone_number_id>:<from>": ${this.name}`,
+      );
+    }
+    return customer;
+  }
+
   onStart() {
     this.sql`CREATE TABLE IF NOT EXISTS messages (
       id INTEGER PRIMARY KEY,
@@ -121,8 +132,13 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       },
       qty,
     );
-    this.setState(next);
-    return next;
+    // Seed the idempotency key the moment the draft becomes non-empty, so it's
+    // stable for every later submit_order retry of this same draft.
+    const seeded = next.draftId
+      ? next
+      : { ...next, draftId: crypto.randomUUID() };
+    this.setState(seeded);
+    return seeded;
   }
 
   /**
@@ -166,6 +182,141 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     };
     this.setState(setAddress(this.state, address));
     return address;
+  }
+
+  /**
+   * Place the confirmed order. Every guard here is deterministic code — the
+   * model is never the last line of defence where money is committed:
+   *  - preconditions: items present, fulfillment set, address present for delivery;
+   *  - revalidate every line against the live catalog (stock + current price)
+   *    under RLS, never trusting the DO snapshot's money;
+   *  - write the order + items in one transaction, then clear the DO draft.
+   *
+   * Returns { order_id, total_minor, currency } on success, or { error } the
+   * model relays. If a price moved, the corrected price is synced into the draft
+   * and the submit aborts, so the customer re-confirms against the right total
+   * before it's written. A retried submit of the same draft collapses to one
+   * order via the idempotency_key UNIQUE.
+   */
+  async submitOrder(): Promise<
+    { order_id: string; total_minor: number; currency: string } | { error: string }
+  > {
+    const state = this.state;
+    if (state.items.length === 0)
+      return { error: "The order is empty — add at least one item before submitting." };
+    if (!state.fulfillment.type)
+      return {
+        error:
+          "Fulfillment isn't set — confirm pickup or delivery with set_fulfillment first.",
+      };
+    if (state.fulfillment.type === "delivery" && !state.fulfillment.address)
+      return {
+        error:
+          "This is a delivery but there's no address yet — collect it with set_address first.",
+      };
+
+    const db = createDb(getSettings(this.env));
+
+    // Revalidate: prices and stock may have moved since the items were added.
+    // Re-read under RLS; the order is written from these live values, not the
+    // DO snapshot's.
+    const ids = state.items.map((i) => i.product_id);
+    const [rows] = await withShop(db, this.shopId, [
+      db`SELECT product_id, name, price_minor, currency, in_stock
+         FROM products WHERE product_id = ANY(${ids}) AND deleted_at IS NULL`,
+    ]);
+    const live = new Map(
+      (
+        rows as {
+          product_id: string;
+          name: string;
+          price_minor: number;
+          currency: string;
+          in_stock: boolean;
+        }[]
+      ).map((r) => [r.product_id, r]),
+    );
+
+    const changes: string[] = [];
+    let priceSynced = false;
+    const items = state.items.map((i) => ({ ...i }));
+    for (const item of items) {
+      const p = live.get(item.product_id);
+      if (!p) {
+        changes.push(`${item.name} is no longer available`);
+      } else if (!p.in_stock) {
+        changes.push(`${item.name} is out of stock`);
+      } else if (p.price_minor !== item.unit_price_minor) {
+        changes.push(`${item.name}'s price has changed`);
+        item.unit_price_minor = p.price_minor;
+        item.currency = p.currency;
+        priceSynced = true;
+      }
+    }
+
+    if (changes.length) {
+      // Sync corrected prices into the draft so a re-confirm converges; never
+      // write a divergent order. Unavailable items the model clears with
+      // remove_item or by offering alternatives.
+      if (priceSynced) {
+        const total = items.reduce((s, i) => s + i.unit_price_minor * i.qty, 0);
+        this.setState({ ...state, items, total_minor: total });
+      }
+      return {
+        error: `The order can't be placed as-is — ${changes.join(
+          "; ",
+        )}. Tell the customer, remove any unavailable items, and re-confirm the updated order before submitting again.`,
+      };
+    }
+
+    const orderId = crypto.randomUUID();
+    const idempotencyKey = `${this.name}:${state.draftId}`;
+    const currency = items[0].currency;
+    const total = items.reduce((s, i) => s + i.unit_price_minor * i.qty, 0);
+    const addr = state.fulfillment.address;
+
+    try {
+      await withShop(db, this.shopId, [
+        db`INSERT INTO orders (
+             order_id, shop_id, customer_phone, fulfillment_type,
+             address_line1, address_line2, address_city, address_postcode, address_notes,
+             currency, total_minor, idempotency_key
+           ) VALUES (
+             ${orderId}, ${this.shopId}, ${this.customer}, ${state.fulfillment.type},
+             ${addr?.line1 ?? null}, ${addr?.line2 ?? null}, ${addr?.city ?? null},
+             ${addr?.postcode ?? null}, ${addr?.notes ?? null},
+             ${currency}, ${total}, ${idempotencyKey}
+           )`,
+        ...items.map(
+          (i) =>
+            db`INSERT INTO order_items
+                 (order_id, product_id, name, unit_price_minor, qty, line_total_minor)
+               VALUES (${orderId}, ${i.product_id}, ${i.name},
+                 ${i.unit_price_minor}, ${i.qty}, ${i.unit_price_minor * i.qty})`,
+        ),
+      ]);
+    } catch (e) {
+      // A retried submit of the same draft hits idempotency_key UNIQUE (23505):
+      // the order already exists, so return it instead of erroring or writing
+      // twice.
+      if ((e as { code?: string }).code === "23505") {
+        const [existing] = await withShop(db, this.shopId, [
+          db`SELECT order_id, total_minor, currency
+             FROM orders WHERE idempotency_key = ${idempotencyKey}`,
+        ]);
+        const row = existing[0] as
+          | { order_id: string; total_minor: number; currency: string }
+          | undefined;
+        if (row) {
+          this.setState(emptyOrder);
+          return row;
+        }
+      }
+      throw e;
+    }
+
+    this.setState(emptyOrder);
+    return { order_id: orderId, total_minor: total, currency };
   }
 
   private async runModel(): Promise<Reply[]> {
@@ -246,6 +397,13 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       execute: (fields) => this.setAddress(fields),
     });
 
+    const submit_order = tool({
+      description:
+        "Place the order once the customer has confirmed the summary. Validates the order and re-checks every item against the live catalog, then writes it for the shop to approve. Returns { order_id, total_minor, currency } on success, or an error to relay — missing details, or items whose price or stock changed (fix those and re-confirm before trying again). Don't call it until the customer has confirmed.",
+      inputSchema: z.object({}),
+      execute: () => this.submitOrder(),
+    });
+
     // One scoped read per turn: shop name + categories with item counts. RLS
     // already limits both to this shop, so neither query needs a shop_id filter.
     const [nameRows, catRows] = await withShop(db, this.shopId, [
@@ -281,6 +439,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
         remove_item,
         set_fulfillment,
         set_address,
+        submit_order,
       },
       stopWhen: stepCountIs(5),
     });

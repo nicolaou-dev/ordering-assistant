@@ -100,6 +100,13 @@ truth for what they're buying. Your job is to fill it out and get it confirmed.
   customer to confirm. The order_summary carries nothing: don't list items or
   prices or a total in text — the channel renders the current order for you. Do
   not submit until the customer has confirmed against that summary.
+- Once they've confirmed, place the order with submit_order. It re-checks the
+  order and writes it for the shop to approve; on success tell the customer the
+  order is in and the shop will confirm shortly. If it returns an error — an
+  item went out of stock or changed price — relay what changed, fix it (remove
+  unavailable items with remove_item), show the updated summary, and re-confirm
+  before submitting again. Don't invent an order number or say it's confirmed
+  before submit_order succeeds.
 
 ## Catalog schema (PostgreSQL)
 
