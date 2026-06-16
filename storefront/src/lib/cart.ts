@@ -1,12 +1,5 @@
 import { atom } from "nanostores";
 
-// Shared cart state across islands. The static Astro grid hydrates one small
-// CartControl per product and one CartBar; both read and mutate this store, so
-// pressing Add on a card updates the bar without either island knowing about
-// the other. The server is the source of truth: every mutation POSTs to the
-// Worker's /cart endpoint and replaces the cart with the response — no price
-// math happens here.
-
 export type CartItem = {
   product_id: string;
   name: string;

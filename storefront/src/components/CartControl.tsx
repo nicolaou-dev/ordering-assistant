@@ -1,11 +1,8 @@
 import { useEffect, useState } from "react";
 import { useStore } from "@nanostores/react";
+import { Plus, Minus, Trash2 } from "lucide-react";
 import { $cart, $pending, getToken, mutate, qtyOf } from "../lib/cart";
 
-// The interactive bit of a product card: Add, then a -/+ stepper once it's in
-// the cart. One of these hydrates per product (client:visible). Disabled until
-// mounted so SSR (no window → no token) and the client agree, then enabled only
-// when a cart token is present.
 export default function CartControl({
   productId,
   name,
@@ -33,19 +30,21 @@ export default function CartControl({
         <button
           onClick={() => mutate(workerUrl, productId, "remove")}
           disabled={disabled}
-          aria-label={`Remove one ${name}`}
-          className="h-7 w-7 rounded-full border border-neutral-300 text-base leading-none disabled:opacity-40"
+          aria-label={qty === 1 ? `Remove ${name}` : `Decrease ${name}`}
+          className={`flex h-7 w-7 items-center justify-center rounded-full border disabled:opacity-40 ${
+            qty === 1 ? "border-red-200 text-red-600" : "border-neutral-300"
+          }`}
         >
-          −
+          {qty === 1 ? <Trash2 size={14} /> : <Minus size={14} />}
         </button>
         <span className="w-4 text-center text-sm font-semibold">{qty}</span>
         <button
           onClick={() => mutate(workerUrl, productId, "add")}
           disabled={disabled}
           aria-label={`Add one ${name}`}
-          className="h-7 w-7 rounded-full bg-emerald-600 text-base leading-none text-white disabled:opacity-40"
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white disabled:opacity-40"
         >
-          +
+          <Plus size={14} />
         </button>
       </div>
     );

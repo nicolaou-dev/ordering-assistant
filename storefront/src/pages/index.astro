@@ -1,9 +1,9 @@
 ---
-import { Image } from "astro:assets";
+import { Image, getImage } from "astro:assets";
 import { loadCatalog } from "../lib/catalog";
 import { money } from "../lib/money";
 import CartControl from "../components/CartControl.tsx";
-import CartBar from "../components/CartBar.tsx";
+import Cart from "../components/Cart.tsx";
 import TokenNotice from "../components/TokenNotice.tsx";
 import "../styles/global.css";
 
@@ -11,6 +11,19 @@ const categories = await loadCatalog();
 const workerUrl = import.meta.env.WORKER_URL ?? "";
 const waNumber = import.meta.env.WA_NUMBER ?? "";
 const shopName = import.meta.env.SHOP_NAME ?? "Menu";
+
+// product_id -> optimized thumbnail, for the cart island (cart items carry no
+// image). Same width/height as the grid <Image>, so the transform is reused.
+const thumbs: Record<string, string> = {};
+for (const cat of categories) {
+  for (const p of cat.products) {
+    if (p.image_url) {
+      thumbs[p.product_id] = (
+        await getImage({ src: p.image_url, width: 320, height: 180 })
+      ).src;
+    }
+  }
+}
 ---
 
 <html lang="en">
@@ -73,6 +86,6 @@ const shopName = import.meta.env.SHOP_NAME ?? "Menu";
 			}
 		</div>
 
-		<CartBar client:load workerUrl={workerUrl} waNumber={waNumber} />
+		<Cart client:load workerUrl={workerUrl} waNumber={waNumber} images={thumbs} />
 	</body>
 </html>
