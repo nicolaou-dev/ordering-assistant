@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { getSettings } from "./settings";
 import { OrderAgent } from "./agent";
 import { verifySignature } from "./verify";
-import { verifyCartToken } from "./cart_token";
+import { mintCartToken, verifyCartToken } from "./cart_token";
 import z from "zod";
 import { createClient } from "./whatsapp/client";
 import { formatOrderSummary } from "./whatsapp/summary";
@@ -26,10 +26,11 @@ type SendCtx = {
   sql: Sql;
   shopId: string;
   orderSummary: () => Promise<string>;
+  menuLink: () => Promise<string>;
 };
 
 async function sendReplies(replies: Reply[], ctx: SendCtx): Promise<void> {
-  const { client, to, sql, shopId, orderSummary } = ctx;
+  const { client, to, sql, shopId, orderSummary, menuLink } = ctx;
   for (const reply of replies) {
     try {
       if (reply.type === "text") {
@@ -60,6 +61,11 @@ async function sendReplies(replies: Reply[], ctx: SendCtx): Promise<void> {
             await client.send(to, caption);
           }
         }
+      } else if (reply.type === "menu") {
+        await client.send(
+          to,
+          `Browse our full menu and add what you'd like:\n${await menuLink()}`,
+        );
       }
     } catch (e) {
       console.error("sendReplies: failed to send a reply", {
@@ -173,6 +179,8 @@ app.post("/webhook/whatsapp", async (c) => {
       sql: createDb(settings),
       shopId: phone_number_id,
       orderSummary: async () => formatOrderSummary(await stub.getOrderState()),
+      menuLink: async () =>
+        `${settings.STOREFRONT_URL}/?t=${await mintCartToken(phone_number_id, from, settings.WHATSAPP_APP_SECRET)}`,
     });
   };
 
@@ -468,6 +476,8 @@ app.post("/cart/checkout", async (c) => {
     sql: createDb(settings),
     shopId: claims.shopId,
     orderSummary: async () => formatOrderSummary(await stub.getOrderState()),
+    menuLink: async () =>
+      `${settings.STOREFRONT_URL}/?t=${await mintCartToken(claims.shopId, claims.customer, settings.WHATSAPP_APP_SECRET)}`,
   });
 
   return c.body(null, 204);

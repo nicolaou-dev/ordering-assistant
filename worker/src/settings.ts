@@ -10,6 +10,9 @@ const Schema = z.object({
   ADMIN_TOKEN: z.string().min(1),
   DATABASE_URL: z.string().min(1),
   DATABASE_URL_ADMIN: z.string().min(1),
+  // Storefront origin (no trailing slash), e.g. http://localhost:4321 in dev.
+  // The agent builds the menu link as `${STOREFRONT_URL}/?t=<cart token>`.
+  STOREFRONT_URL: z.string().min(1),
 });
 
 export type Settings = z.infer<typeof Schema>;

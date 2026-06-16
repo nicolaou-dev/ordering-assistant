@@ -19,10 +19,15 @@ const ProductList = z.object({
   type: z.literal("product_list"),
   product_ids: z.array(z.string()).min(1),
 });
+// Channel-neutral signal to show the shop's storefront. Carries no data: the
+// harness mints a cart token for this session and sends a link to the storefront,
+// where the customer browses the full catalog and adds to this same order.
+const Menu = z.object({ type: z.literal("menu") });
 export const Reply = z.discriminatedUnion("type", [
   Text,
   AddressRequest,
   OrderSummary,
   ProductList,
+  Menu,
 ]);
 export type Reply = z.infer<typeof Reply>;
