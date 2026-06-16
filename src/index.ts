@@ -241,6 +241,35 @@ app.post("/admin/catalog/:shop_id", async (c) => {
   return c.json({ count: products.length });
 });
 
+// Create or rename a shop. Catalog ingest defaults shops.name to the shop_id;
+// this sets a real name. ON CONFLICT updates only the name, so re-running ingest
+// (which inserts shops ON CONFLICT DO NOTHING) never clobbers it.
+const ShopBody = z.object({
+  phone_number_id: z.string().trim().min(1),
+  name: z.string().trim().min(1),
+});
+
+app.post("/admin/shops", async (c) => {
+  const settings = getSettings(c.env);
+  const token = c.req.header("Authorization")?.slice(7);
+  if (token !== settings.ADMIN_TOKEN) {
+    return c.body(null, 401);
+  }
+
+  const parsed = ShopBody.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ errors: parsed.error.issues }, 400);
+  }
+
+  const sql = createAdminDb(settings);
+  const [shop] = await sql`
+    INSERT INTO shops (phone_number_id, name)
+    VALUES (${parsed.data.phone_number_id}, ${parsed.data.name})
+    ON CONFLICT (phone_number_id) DO UPDATE SET name = excluded.name
+    RETURNING phone_number_id, name`;
+  return c.json(shop);
+});
+
 app.get("/debug/rls/:shop_id", async (c) => {
   const settings = getSettings(c.env);
   const sql = createDb(settings);
