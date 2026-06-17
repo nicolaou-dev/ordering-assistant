@@ -1,25 +1,27 @@
 import { system } from "./prompts/ordering_v1";
-import { generateText, Output, stepCountIs, tool, type ModelMessage } from "ai";
+import { generateText, Output, stepCountIs, type ModelMessage } from "ai";
 import { Reply } from "./reply";
 import { Agent, callable } from "agents";
 import { getSettings } from "./settings";
 import { createDb, withShop } from "./db";
-import { guardQuery } from "./query_guard";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import {
   addItem as addItemToOrder,
   removeItem as removeItemFromOrder,
-  setFulfillment,
   setAddress,
   emptyOrder,
   renderOrderSnapshot,
   type OrderState,
   type Address,
 } from "./order";
-import z from "zod";
-
-/** Max rows returned to the model from one query_data call. */
-const ROW_CAP = 50;
+import {
+  queryDataTool,
+  addItemTool,
+  removeItemTool,
+  setFulfillmentTool,
+  setAddressTool,
+  submitOrderTool,
+} from "./tools";
 
 export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   initialState: OrderState = emptyOrder;
@@ -338,85 +340,22 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     const output = Output.array({ element: Reply });
     const settings = getSettings(this.env);
     const db = createDb(settings);
-    const query_data = tool({
-      description:
-        "Run a read-only SQL SELECT against this shop's catalog (products, shops). Results are automatically scoped to this shop. Returns up to " +
-        ROW_CAP +
-        " rows; if truncated is true, narrow the query.",
-      inputSchema: z.object({
-        sql: z.string().describe("A single SELECT/CTE against products/shops."),
-      }),
-      execute: async ({ sql }) => {
-        const guard = guardQuery(sql);
-        if ("error" in guard) return { error: guard.error };
-
-        // Wrap to cap rows: only safe because the guard proved a single SELECT.
-        const capped = `SELECT * FROM (${guard.sql}) AS _q LIMIT ${ROW_CAP + 1}`;
-        try {
-          const [rows] = await withShop(db, this.shopId, [db.query(capped)]);
-          const truncated = rows.length > ROW_CAP;
-          return { rows: truncated ? rows.slice(0, ROW_CAP) : rows, truncated };
-        } catch (e) {
-          return { error: (e as Error).message };
-        }
-      },
+    const query_data = queryDataTool({ db, shopId: this.shopId });
+    const add_item = addItemTool({
+      addItem: (product_id, qty) => this.addItem(product_id, qty),
     });
-
-    const add_item = tool({
-      description:
-        "Add qty of a catalog product (by product_id) to the order. Stock, quantity merging and the total are handled for you; returns the updated order, or an error with nothing added.",
-      inputSchema: z.object({
-        product_id: z.string().describe("The product_id of a catalog product."),
-        qty: z.number().int().positive().describe("How many to add."),
-      }),
-      execute: ({ product_id, qty }) => this.addItem(product_id, qty),
+    const remove_item = removeItemTool({
+      removeItem: (product_id, qty) => this.removeItem(product_id, qty),
     });
-
-    const remove_item = tool({
-      description:
-        "Remove qty of a product (by product_id) already in the order, decrementing that line. If qty reaches or exceeds the line's quantity, the line is dropped. The total is handled for you; returns the updated order, or an error with nothing changed.",
-      inputSchema: z.object({
-        product_id: z
-          .string()
-          .describe("The product_id of a line already in the order."),
-        qty: z.number().int().positive().describe("How many to remove."),
-      }),
-      execute: ({ product_id, qty }) => this.removeItem(product_id, qty),
+    const set_fulfillment = setFulfillmentTool({
+      getState: () => this.state,
+      setState: (state) => this.setState(state),
     });
-
-    const set_fulfillment = tool({
-      description:
-        "Record how the customer wants the order fulfilled: pickup or delivery. Call it once they say which; calling again just switches the type. Returns the updated fulfillment. Does not collect an address.",
-      inputSchema: z.object({
-        type: z
-          .enum(["pickup", "delivery"])
-          .describe("How the order is handed over."),
-      }),
-      execute: async ({ type }) => {
-        const next = setFulfillment(this.state, type);
-        this.setState(next);
-        return next.fulfillment;
-      },
+    const set_address = setAddressTool({
+      setAddress: (fields) => this.setAddress(fields),
     });
-
-    const set_address = tool({
-      description:
-        "Save the customer's delivery address, parsed into parts from what they typed. line1 (street and number), city and postcode are required; line2 and notes (delivery instructions) are optional. Returns the saved address to read back for confirmation, or an error naming what's missing so you can ask the customer for it. Only for delivery orders.",
-      inputSchema: z.object({
-        line1: z.string().optional().describe("Street address and number."),
-        line2: z.string().optional().describe("Flat, unit or second line."),
-        city: z.string().optional().describe("City or town."),
-        postcode: z.string().optional().describe("Postal / ZIP code."),
-        notes: z.string().optional().describe("Delivery instructions."),
-      }),
-      execute: (fields) => this.setAddress(fields),
-    });
-
-    const submit_order = tool({
-      description:
-        "Place the order once the customer has confirmed the summary. Validates the order and re-checks every item against the live catalog, then writes it for the shop to approve. Returns { order_id, total_minor, currency } on success, or an error to relay — missing details, or items whose price or stock changed (fix those and re-confirm before trying again). Don't call it until the customer has confirmed.",
-      inputSchema: z.object({}),
-      execute: () => this.submitOrder(),
+    const submit_order = submitOrderTool({
+      submitOrder: () => this.submitOrder(),
     });
 
     // One scoped read per turn: shop name + categories with item counts. RLS
