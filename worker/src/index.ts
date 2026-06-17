@@ -472,6 +472,15 @@ app.post("/debug/summary", async (c) => {
   return c.json({ summary });
 });
 
+// Raw draft order state for an agent instance — the eval harness reads this to
+// assert on outcomes (items, qty, total, fulfillment, address) rather than the
+// formatted summary string.
+app.post("/debug/state", async (c) => {
+  const { instance } = await c.req.json<{ instance: string }>();
+  const stub = await getAgentByName(c.env.OrderAgent, instance);
+  return c.json(await stub.getOrderState());
+});
+
 // Operator escape hatch: wipe an agent's Durable Object (order + history) so a
 // customer session can be reset. Guarded by ADMIN_TOKEN like /admin/catalog,
 // since it destroys state.
