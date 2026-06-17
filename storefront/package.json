@@ -9,7 +9,11 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
+    "deploy": "node --env-file=.env scripts/deploy.mjs",
     "astro": "astro"
+  },
+  "devDependencies": {
+    "wrangler": "^4.98.0"
   },
   "dependencies": {
     "@astrojs/react": "^5.0.7",
