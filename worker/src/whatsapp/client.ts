@@ -48,6 +48,46 @@ export const createClient = (settings: Settings) => {
         );
       }
     },
+    // An interactive "Call To Action URL" message: a short body plus a single
+    // tappable button that opens `url`. WhatsApp renders the button instead of a
+    // bare link, so the URL never shows as raw text. A free session message — no
+    // template needed inside the 24h window.
+    sendCtaUrl: async (
+      to: string,
+      body: string,
+      buttonText: string,
+      url: string,
+    ) => {
+      const apiUrl = `https://graph.facebook.com/${settings.WHATSAPP_API_VERSION}/${settings.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+      const result = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${settings.WHATSAPP_ACCESS_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to,
+          type: "interactive",
+          interactive: {
+            type: "cta_url",
+            body: { text: body },
+            action: {
+              name: "cta_url",
+              parameters: { display_text: buttonText, url },
+            },
+          },
+        }),
+      });
+
+      if (!result.ok) {
+        const errorBody = await result.text();
+        throw new Error(
+          `WhatsApp sendCtaUrl failed: ${result.status} ${errorBody}`,
+        );
+      }
+    },
     markReadTyping: async (messageId: string) => {
       const url = `https://graph.facebook.com/${settings.WHATSAPP_API_VERSION}/${settings.WHATSAPP_PHONE_NUMBER_ID}/messages`;
       const result = await fetch(url, {

@@ -65,9 +65,13 @@ async function sendReplies(replies: Reply[], ctx: SendCtx): Promise<void> {
           }
         }
       } else if (reply.type === "menu") {
-        await client.send(
+        // Render as an interactive CTA URL button ("Menu") rather than a text
+        // with the raw link, so the customer taps a button instead of a URL.
+        await client.sendCtaUrl(
           to,
-          `Browse our full menu and add what you'd like:\n${await menuLink()}`,
+          "Browse our full menu and add what you'd like.",
+          "Menu",
+          await menuLink(),
         );
       }
     } catch (e) {
