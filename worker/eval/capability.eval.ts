@@ -71,6 +71,16 @@ orderingEval("delivery address read back labelled, then confirm", {
   trialCount: 3,
 });
 
+orderingEval("post-submit reply: awaiting approval + total, no order id", {
+  turns: ["pickup, one coca cola", "that's all", "yes, confirm and place it"],
+  expected: {
+    submitted: true,
+    rubric:
+      "After the order is placed, did the assistant tell the customer it's been sent to the shop for approval and that they'll be notified once it's confirmed, include the order total, and avoid reading out any order id / reference number?",
+  },
+  trialCount: 3,
+});
+
 orderingEval("[known gap] finds 'tahini pie'", {
   turns: ["for pickup, can I get a tahini pie?"],
   expected: { replies: [{ turn: 0, present: ["product_list"], absent: ["menu"] }] },
