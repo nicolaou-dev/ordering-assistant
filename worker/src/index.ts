@@ -30,6 +30,13 @@ type SendCtx = {
   menuLink: () => Promise<string>;
 };
 
+// Button ids for the pickup/delivery prompt. Shared by the render (sendReplies)
+// and the inbound tap handler so a tap maps back to a fulfillment type in code.
+const FULFILLMENT_BUTTON = {
+  pickup: "fulfillment:pickup",
+  delivery: "fulfillment:delivery",
+} as const;
+
 async function sendReplies(replies: Reply[], ctx: SendCtx): Promise<void> {
   const { client, to, sql, shopId, orderSummary, menuLink } = ctx;
   for (const reply of replies) {
@@ -73,6 +80,13 @@ async function sendReplies(replies: Reply[], ctx: SendCtx): Promise<void> {
           "Menu",
           await menuLink(),
         );
+      } else if (reply.type === "fulfillment_prompt") {
+        // Two tappable buttons instead of a free-text question; the tap comes
+        // back as interactive.button_reply.id and is handled in code.
+        await client.sendReplyButtons(to, "Pickup or delivery?", [
+          { id: FULFILLMENT_BUTTON.pickup, title: "Pickup" },
+          { id: FULFILLMENT_BUTTON.delivery, title: "Delivery" },
+        ]);
       }
     } catch (e) {
       console.error("sendReplies: failed to send a reply", {
@@ -120,6 +134,16 @@ const Value = z.object({
         id: z.string(),
         type: z.string(),
         text: z.object({ body: z.string() }).optional(),
+        // A tapped reply button (e.g. the pickup/delivery prompt): the id is the
+        // one we set when sending the buttons.
+        interactive: z
+          .object({
+            type: z.string(),
+            button_reply: z
+              .object({ id: z.string(), title: z.string() })
+              .optional(),
+          })
+          .optional(),
       }),
     )
     .nonempty(),
@@ -149,8 +173,9 @@ app.post("/webhook/whatsapp", async (c) => {
   }
 
   const { phone_number_id } = parsed.data.metadata;
-  const { from, id, text } = parsed.data.messages[0];
+  const { from, id, text, interactive } = parsed.data.messages[0];
   const sessionKey = `${phone_number_id}:${from}`;
+  const buttonId = interactive?.button_reply?.id;
 
   const handleInbound = async () => {
     const result = await c.env.DB.prepare(
@@ -164,9 +189,10 @@ app.post("/webhook/whatsapp", async (c) => {
       return;
     }
 
-    console.log("inbound", { from, id, text: text?.body });
+    console.log("inbound", { from, id, text: text?.body, buttonId });
 
-    if (!text?.body) return;
+    // Either a typed message or a tapped button; ignore anything else.
+    if (!text?.body && !buttonId) return;
 
     const client = createClient(settings);
 
@@ -178,7 +204,20 @@ app.post("/webhook/whatsapp", async (c) => {
     });
 
     const stub = await getAgentByName(c.env.OrderAgent, sessionKey);
-    const replies = await stub.runTurn(text.body);
+    // A tapped pickup/delivery button sets fulfillment in code, then runs a turn
+    // off an internal marker — the model never re-parses the choice. A typed
+    // message runs the normal turn. An unrecognised button is ignored.
+    let replies: Reply[];
+    if (buttonId === FULFILLMENT_BUTTON.pickup) {
+      replies = await stub.tapFulfillment("pickup");
+    } else if (buttonId === FULFILLMENT_BUTTON.delivery) {
+      replies = await stub.tapFulfillment("delivery");
+    } else if (buttonId) {
+      console.log("unhandled button id", { buttonId });
+      return;
+    } else {
+      replies = await stub.runTurn(text!.body);
+    }
 
     await sendReplies(replies, {
       client,
@@ -463,6 +502,19 @@ app.post("/debug/chat", async (c) => {
   }>();
   const stub = await getAgentByName(c.env.OrderAgent, instance);
   const replies = await stub.runTurn(message);
+  return c.json({ replies });
+});
+
+// Debug seam for a pickup/delivery button tap, mirroring the webhook's
+// button-reply path (set fulfillment in code, then a continuation turn) without
+// the WhatsApp signature/D1 plumbing — so the eval harness can drive a tap.
+app.post("/debug/tap", async (c) => {
+  const { instance, type } = await c.req.json<{
+    instance: string;
+    type: "pickup" | "delivery";
+  }>();
+  const stub = await getAgentByName(c.env.OrderAgent, instance);
+  const replies = await stub.tapFulfillment(type);
   return c.json({ replies });
 });
 

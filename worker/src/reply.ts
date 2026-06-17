@@ -20,10 +20,16 @@ const ProductList = z.object({
 // harness mints a cart token for this session and sends a link to the storefront,
 // where the customer browses the full catalog and adds to this same order.
 const Menu = z.object({ type: z.literal("menu") });
+// Channel-neutral signal to ask whether the order is pickup or delivery. Carries
+// no data: the channel renders it as two tappable reply buttons (Pickup,
+// Delivery); a tap is plumbed back in code, so the model never re-parses the
+// choice. Falls back to a plain text question on channels without buttons.
+const FulfillmentPrompt = z.object({ type: z.literal("fulfillment_prompt") });
 export const Reply = z.discriminatedUnion("type", [
   Text,
   OrderSummary,
   ProductList,
   Menu,
+  FulfillmentPrompt,
 ]);
 export type Reply = z.infer<typeof Reply>;

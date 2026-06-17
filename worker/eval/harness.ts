@@ -19,18 +19,29 @@ const BASE = process.env.EVAL_BASE_URL ?? "http://localhost:8787";
 const SHOP = process.env.WHATSAPP_PHONE_NUMBER_ID ?? "1098392886696367";
 const ADMIN = process.env.ADMIN_TOKEN ?? "";
 
-export type ReplyType = "text" | "order_summary" | "product_list" | "menu";
+export type ReplyType =
+  | "text"
+  | "order_summary"
+  | "product_list"
+  | "menu"
+  | "fulfillment_prompt";
 export type Reply =
   | { type: "text"; body: string }
   | { type: "order_summary" }
   | { type: "product_list"; product_ids: string[] }
-  | { type: "menu" };
+  | { type: "menu" }
+  | { type: "fulfillment_prompt" };
 
 type OrderState = {
   items: { product_id: string; qty: number; name: string; unit_price_minor: number }[];
   total_minor: number;
   fulfillment: { type: "pickup" | "delivery" | null; address: unknown | null };
 };
+
+// A turn the customer takes: either a typed message (string) or a tapped
+// pickup/delivery button ({ tap }). A tap drives /debug/tap, mirroring the
+// webhook's button-reply path.
+export type Turn = string | { tap: "pickup" | "delivery" };
 
 // What a case asserts about the conversation it just drove. All fields are
 // serializable so Evalite can show them in the run UI/history.
@@ -70,7 +81,7 @@ async function post(path: string, body: unknown, auth = false): Promise<Response
   });
 }
 
-async function drive(customer: string, turns: string[]): Promise<Convo> {
+async function drive(customer: string, turns: Turn[]): Promise<Convo> {
   const instance = `${SHOP}:${customer}`;
   await post("/debug/reset", { instance }, true);
 
@@ -79,11 +90,16 @@ async function drive(customer: string, turns: string[]): Promise<Convo> {
   const lines: string[] = [];
 
   for (const user of turns) {
-    const r = await post("/debug/chat", { instance, message: user });
-    if (!r.ok) throw new Error(`/debug/chat ${r.status}: ${await r.text()}`);
+    // A tap drives /debug/tap (button-reply path); a string drives /debug/chat.
+    const [path, payload, label] =
+      typeof user === "string"
+        ? ["/debug/chat", { instance, message: user }, `Customer: ${user}`]
+        : ["/debug/tap", { instance, type: user.tap }, `Customer tapped: ${user.tap}`];
+    const r = await post(path, payload);
+    if (!r.ok) throw new Error(`${path} ${r.status}: ${await r.text()}`);
     const turnReplies = ((await r.json()) as { replies: Reply[] }).replies;
     replies.push(turnReplies);
-    lines.push(`Customer: ${user}`);
+    lines.push(label);
     for (const rep of turnReplies) lines.push(`Assistant[${rep.type}]: ${"body" in rep ? rep.body : ""}`);
 
     const s = await post("/debug/state", { instance });
@@ -104,7 +120,7 @@ const texts = (rss: Reply[][]) =>
 
 // Outcome grader: per-turn reply types, final order state, and submit. Returns
 // the fraction of checks that passed, with the failures as metadata.
-const outcomeScorer = createScorer<string[], Convo, Spec>({
+const outcomeScorer = createScorer<Turn[], Convo, Spec>({
   name: "outcome",
   description: "Reply types, order state, and submission match the case's expectations",
   scorer: ({ output, expected }) => {
@@ -138,7 +154,7 @@ const outcomeScorer = createScorer<string[], Convo, Spec>({
 
 // Grounding grader: every €-amount in a text reply must be a real catalog price
 // or a total the order actually reached — never a figure the model invented.
-const groundingScorer = createScorer<string[], Convo, Spec>({
+const groundingScorer = createScorer<Turn[], Convo, Spec>({
   name: "grounding",
   description: "No invented prices in text replies",
   scorer: async ({ output }) => {
@@ -158,7 +174,7 @@ const groundingScorer = createScorer<string[], Convo, Spec>({
 // to avoid self-preference bias). One rubric, score + reason, "can't tell"=0.5.
 const judgeModel = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY }).languageModel("claude-sonnet-4-6");
 const judgeScorer = (rubric: string) =>
-  createScorer<string[], Convo, Spec>({
+  createScorer<Turn[], Convo, Spec>({
     name: "judge",
     description: rubric,
     scorer: async ({ output }) => {
@@ -175,8 +191,8 @@ const judgeScorer = (rubric: string) =>
 
 const slug = (name: string) => `eval-${name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`;
 
-export function orderingEval(name: string, opts: { turns: string[]; expected: Spec; trialCount?: number }) {
-  evalite<string[], Convo, Spec>(name, {
+export function orderingEval(name: string, opts: { turns: Turn[]; expected: Spec; trialCount?: number }) {
+  evalite<Turn[], Convo, Spec>(name, {
     trialCount: opts.trialCount ?? 1,
     data: async () => [{ input: opts.turns, expected: opts.expected }],
     task: (turns) => drive(slug(name), turns),
@@ -184,7 +200,7 @@ export function orderingEval(name: string, opts: { turns: string[]; expected: Sp
     // Readable CLI/UI cell instead of "[object Object]": the reply types per
     // turn, plus whether an order was submitted.
     columns: ({ input, output }) => [
-      { label: "Conversation", value: input.join("  ›  ") },
+      { label: "Conversation", value: input.map((t) => (typeof t === "string" ? t : `tap:${t.tap}`)).join("  ›  ") },
       { label: "Replies", value: output.replies.map((t) => t.map((r) => r.type).join("+")).join(" | ") },
       { label: "Submitted", value: output.submitted },
     ],

@@ -4,10 +4,16 @@
 
 import { orderingEval } from "./harness";
 
-orderingEval("greeting: no products on hello", {
+orderingEval("greeting: pickup/delivery prompt, no products", {
   turns: ["hi"],
   expected: {
-    replies: [{ turn: 0, absent: ["product_list", "menu", "order_summary"] }],
+    replies: [
+      {
+        turn: 0,
+        present: ["fulfillment_prompt"],
+        absent: ["product_list", "menu", "order_summary"],
+      },
+    ],
     state: { empty: true },
   },
 });
@@ -17,6 +23,14 @@ orderingEval("fulfillment recorded, no premature summary", {
   expected: {
     replies: [{ turn: 1, absent: ["order_summary"] }],
     state: { fulfillment: "delivery" },
+  },
+});
+
+orderingEval("tap delivery button: sets fulfillment, continues", {
+  turns: [{ tap: "delivery" }],
+  expected: {
+    state: { fulfillment: "delivery" },
+    replies: [{ turn: 0, present: ["menu"] }],
   },
 });
 

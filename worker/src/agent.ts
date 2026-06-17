@@ -9,6 +9,7 @@ import {
   addItem as addItemToOrder,
   removeItem as removeItemFromOrder,
   setAddress,
+  setFulfillment,
   emptyOrder,
   renderOrderSnapshot,
   type OrderState,
@@ -73,6 +74,21 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   async checkout(): Promise<Reply[]> {
     this
       .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify("[The customer tapped Checkout in the storefront — they've finished choosing. Show the order summary and ask them to confirm; no need to ask if they want anything else.]")})`;
+    return this.runModel();
+  }
+
+  /**
+   * The customer tapped the Pickup or Delivery button. A deterministic trigger,
+   * not a typed message: set fulfillment in code (the model never re-parses the
+   * choice), drop an internal marker, then run one turn so the model carries on
+   * (e.g. sends the menu). The marker is context for the model, never sent to
+   * the customer.
+   */
+  @callable()
+  async tapFulfillment(type: "pickup" | "delivery"): Promise<Reply[]> {
+    this.setState(setFulfillment(this.state, type));
+    this
+      .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify(`[The customer tapped "${type}" — fulfillment is now set to ${type}. Carry on from here.]`)})`;
     return this.runModel();
   }
 

@@ -152,8 +152,8 @@ function nextStep(state: OrderState): string {
   const hasItems = state.items.length > 0;
   if (!type) {
     return hasItems
-      ? "ask whether it's pickup or delivery."
-      : "greet the customer and ask whether it's pickup or delivery — unless they've named an item to order, in which case look it up.";
+      ? "ask whether it's pickup or delivery with a fulfillment_prompt."
+      : "greet the customer and ask whether it's pickup or delivery with a fulfillment_prompt — unless they've named an item to order, in which case look it up.";
   }
   if (!hasItems) {
     return "send the menu so they can browse and add items.";
