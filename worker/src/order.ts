@@ -132,13 +132,37 @@ export function renderOrderSnapshot(state: OrderState): string {
   if (type === "delivery") {
     header += `\nAddress: ${address ? formatAddress(address) : "needed"}`;
   }
+  const next = `\n\nNext: ${nextStep(state)}`;
   if (state.items.length === 0) {
-    return `${header}\n\n(empty — no items added yet)`;
+    return `${header}\n\n(empty — no items added yet)${next}`;
   }
   const currency = state.items[0].currency;
   const lines = state.items.map((i) => {
     const lineTotal = i.unit_price_minor * i.qty;
     return `- ${i.qty} x ${i.name} @ ${i.unit_price_minor} = ${lineTotal}`;
   });
-  return `${header}\nCurrency: ${currency} (all amounts below are price_minor — minor units, e.g. 850 = 8.50)\n\n${lines.join("\n")}\n\nOrder total: ${state.total_minor}`;
+  return `${header}\nCurrency: ${currency} (all amounts below are price_minor — minor units, e.g. 850 = 8.50)\n\n${lines.join("\n")}\n\nOrder total: ${state.total_minor}${next}`;
+}
+
+// A one-line heuristic for the likely next step, derived from the order state.
+// It's a guide for the model, not a command — a clear request from the customer
+// (e.g. naming an item up front) takes priority over the suggested step.
+function nextStep(state: OrderState): string {
+  const { type, address } = state.fulfillment;
+  const hasItems = state.items.length > 0;
+  if (!type) {
+    return hasItems
+      ? "ask whether it's pickup or delivery."
+      : "greet the customer and ask whether it's pickup or delivery — unless they've named an item to order, in which case look it up.";
+  }
+  if (!hasItems) {
+    return "send the menu so they can browse and add items.";
+  }
+  // The order has items: don't rush to the summary. Check they're done first;
+  // collect a delivery address (if needed) only once they are.
+  const finish =
+    type === "delivery" && !address
+      ? "collect the delivery address with set_address, then show the order_summary to confirm"
+      : "show the order_summary to confirm";
+  return `ask if they'd like anything else; once they're done, ${finish}.`;
 }

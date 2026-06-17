@@ -72,7 +72,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   @callable()
   async checkout(): Promise<Reply[]> {
     this
-      .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify("[The customer tapped Checkout in the storefront. Show the order summary and ask them to confirm.]")})`;
+      .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify("[The customer tapped Checkout in the storefront — they've finished choosing. Show the order summary and ask them to confirm; no need to ask if they want anything else.]")})`;
     return this.runModel();
   }
 

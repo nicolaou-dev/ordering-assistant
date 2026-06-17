@@ -44,3 +44,31 @@ case-insensitively") is whack-a-mole: if it's not that, it'll be something else.
 Fix it by giving the model the data/vocabulary it's guessing at, improving the
 prompt's general principles, or using a more capable model. Name the
 symptom-vs-cause tradeoff and recommend the principled fix.
+
+## Prompting & tools
+
+The agent prompt is engineered, not improvised. Decisions follow documented
+practice — Anthropic's "effective context engineering for agents", "writing
+effective tools for agents", "building effective agents" and "Claude 4 prompting
+best practices", plus the workflow-graph patterns in arXiv 2505.23006 — not
+intuition. Check those before reshaping the prompt or tools.
+
+- **Small and high-signal, not just short.** Cut redundant restatement, keep
+  concrete signal. Vague guidance is as bad as an over-prescriptive rulebook.
+- **Steer just-in-time, not up front.** Put situational guidance where the model
+  reads it the moment it matters: a `next` hint on a tool's return (e.g.
+  `query_data` keys advice on row count) and the order snapshot's `Next:` line for
+  the macro flow. The static prompt holds the role, a few heuristics, and
+  examples — not a per-situation rulebook.
+- **Say what TO do, not what NOT to do**, and drop emphatic caps ("NEVER/MUST").
+  Haiku 4.5 follows precise, calm instructions and overtriggers on shouting.
+- **Examples beat prose.** A few canonical `<example>`s steer a small model
+  better than paragraphs of rules.
+- **Tool descriptions are onboarding docs.** Make implicit context explicit and
+  keep it on the tool (the catalog schema lives on `query_data`, not the prompt).
+  Return high-signal results and coach through error messages.
+- **This is a workflow, not an open-ended agent.** Prefer code-driven control
+  (state-gated tools, validation inside the tool bodies) over asking the prompt to
+  police the flow.
+- **Measure, don't eyeball.** Validate prompt/behaviour changes against the eval
+  harness rather than a single `/debug/chat` run.
