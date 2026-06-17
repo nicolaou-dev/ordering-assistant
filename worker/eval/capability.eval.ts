@@ -81,6 +81,25 @@ orderingEval("post-submit reply: awaiting approval + total, no order id", {
   trialCount: 3,
 });
 
+orderingEval("summary step: show, ask, wait — no premature 'placed'", {
+  turns: [
+    "pickup, one coca cola",
+    "that's all",
+    "actually add a sprite",
+    "yep that's right, go ahead",
+  ],
+  expected: {
+    replies: [
+      { turn: 1, present: ["order_summary"] },
+      { turn: 2, present: ["order_summary"], absent: ["menu"] },
+    ],
+    submitted: true,
+    rubric:
+      "At the summary step the assistant shows the order and clearly asks the customer to confirm, and does not use wording implying the order is already placed/done before the customer has confirmed. An edit ('add a sprite') updates the order and re-shows the summary. Only after the customer confirms is the order placed.",
+  },
+  trialCount: 3,
+});
+
 orderingEval("[known gap] finds 'tahini pie'", {
   turns: ["for pickup, can I get a tahini pie?"],
   expected: { replies: [{ turn: 0, present: ["product_list"], absent: ["menu"] }] },

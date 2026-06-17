@@ -159,10 +159,15 @@ function nextStep(state: OrderState): string {
     return "send the menu so they can browse and add items.";
   }
   // The order has items: don't rush to the summary. Check they're done first;
-  // collect a delivery address (if needed) only once they are.
+  // collect a delivery address (if needed) only once they are. At the summary
+  // step, show it, ask, and wait — the order is placed only once the customer
+  // confirms and submit_order succeeds, so avoid "placed/done" language before
+  // that.
+  const summaryStep =
+    "send the order_summary with a short text asking them to confirm it, and wait for their reply — place it with submit_order only once they've confirmed";
   const finish =
     type === "delivery" && !address
-      ? "collect the delivery address with set_address, then show the order_summary to confirm"
-      : "show the order_summary to confirm";
+      ? `collect the delivery address with set_address, then ${summaryStep}`
+      : summaryStep;
   return `ask if they'd like anything else; once they're done, ${finish}.`;
 }
