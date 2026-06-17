@@ -57,6 +57,20 @@ orderingEval("[persona] indecisive browser", {
   trialCount: 3,
 });
 
+orderingEval("delivery address read back labelled, then confirm", {
+  turns: [
+    "delivery please, can I get a coca cola",
+    "that's everything",
+    "deliver to 12 Oak Street, Springfield, 12345",
+  ],
+  expected: {
+    state: { fulfillment: "delivery" },
+    rubric:
+      "After the customer gives their delivery address, did the assistant read it back with labelled fields (e.g. an Address line, City, Postcode) and ask the customer to confirm it's correct before moving on?",
+  },
+  trialCount: 3,
+});
+
 orderingEval("[known gap] finds 'tahini pie'", {
   turns: ["for pickup, can I get a tahini pie?"],
   expected: { replies: [{ turn: 0, present: ["product_list"], absent: ["menu"] }] },

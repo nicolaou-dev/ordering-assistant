@@ -10,7 +10,7 @@ export function setAddressTool({
 }) {
   return tool({
     description:
-      "Save the customer's delivery address, parsed into parts from what they typed. line1 (street and number), city and postcode are required; line2 and notes (delivery instructions) are optional. Returns the saved address to read back for confirmation, or an error naming what's missing so you can ask the customer for it. Only for delivery orders.",
+      "Save the customer's delivery address, parsed into parts from what they typed. line1 (street and number), city and postcode are required; line2 and notes (delivery instructions) are optional. Returns the saved address, or an error naming what's missing so you can ask the customer for it. Only for delivery orders.",
     inputSchema: z.object({
       line1: z.string().optional().describe("Street address and number."),
       line2: z.string().optional().describe("Flat, unit or second line."),
@@ -18,6 +18,13 @@ export function setAddressTool({
       postcode: z.string().optional().describe("Postal / ZIP code."),
       notes: z.string().optional().describe("Delivery instructions."),
     }),
-    execute: (fields) => setAddress(fields),
+    execute: (fields) => {
+      const result = setAddress(fields);
+      if ("error" in result) return result;
+      return {
+        address: result,
+        next: "Read the saved address back to the customer as labelled lines — Address 1, City, Postcode, plus Address 2 and Notes when each is present — then ask them to confirm it's right before continuing.",
+      };
+    },
   });
 }
