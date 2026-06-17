@@ -9,7 +9,9 @@
     "db:migrate": "node --env-file=.dev.vars node_modules/node-pg-migrate/bin/node-pg-migrate.js up -m db/migrations -d DATABASE_URL_ADMIN",
     "db:migrate:down": "node --env-file=.dev.vars node_modules/node-pg-migrate/bin/node-pg-migrate.js down -m db/migrations -d DATABASE_URL_ADMIN",
     "db:migrate:new": "node-pg-migrate create -m db/migrations -j sql",
-    "eval": "node --env-file=.dev.vars eval/run.ts",
+    "eval": "node --env-file=.dev.vars node_modules/evalite/dist/bin.js run eval/regression.eval.ts --threshold 90",
+    "eval:all": "node --env-file=.dev.vars node_modules/evalite/dist/bin.js run --threshold 0",
+    "eval:watch": "node --env-file=.dev.vars node_modules/evalite/dist/bin.js watch",
     "typecheck": "tsc --noEmit",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings"
   },
@@ -25,9 +27,11 @@
   },
   "devDependencies": {
     "@types/node": "^25.9.2",
+    "evalite": "1.0.0-beta.16",
     "node-pg-migrate": "^8.0.4",
     "pg": "^8.21.0",
     "typescript": "^6.0.3",
+    "vitest": "^4.1.9",
     "wrangler": "^4.98.0"
   }
 }

@@ -71,4 +71,8 @@ intuition. Check those before reshaping the prompt or tools.
   (state-gated tools, validation inside the tool bodies) over asking the prompt to
   police the flow.
 - **Measure, don't eyeball.** Validate prompt/behaviour changes against the eval
-  harness rather than a single `/debug/chat` run.
+  harness rather than a single `/debug/chat` run. The eval that pins a behaviour
+  change lands in the same ticket that makes the change — scope and acceptance —
+  not a separate "update evals" ticket. Deterministic outcomes (state,
+  `submitted`, reply types) go in `regression.eval.ts`; wording/qualitative
+  checks go in `capability.eval.ts` as a `rubric`.
