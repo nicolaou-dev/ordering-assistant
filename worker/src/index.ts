@@ -518,6 +518,16 @@ app.post("/debug/tap", async (c) => {
   return c.json({ replies });
 });
 
+// Debug seam for the storefront Checkout tap, mirroring /cart/checkout's
+// continuation turn without the cart-token plumbing — so the eval harness can
+// drive a checkout.
+app.post("/debug/checkout", async (c) => {
+  const { instance } = await c.req.json<{ instance: string }>();
+  const stub = await getAgentByName(c.env.OrderAgent, instance);
+  const replies = await stub.checkout();
+  return c.json({ replies });
+});
+
 // Debug-only stand-in for the send-time render of an order_summary reply: shows
 // the hydrated, customer-facing summary the channel would send, so hydration is
 // testable without WhatsApp.

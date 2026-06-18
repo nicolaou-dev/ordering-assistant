@@ -66,14 +66,16 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
 
   /**
    * The customer tapped Checkout in the storefront. A deterministic trigger,
-   * not a typed message: drop an internal marker so the
-   * model shows the order summary and asks them to confirm, then run one turn.
-   * The marker is context for the model, never sent to the customer.
+   * not a typed message: drop an internal marker recording the one fact the
+   * order state can't express — they've finished adding items, so don't ask
+   * "anything else?" — and let the snapshot's Next hint own what follows
+   * (confirm the items via the summary, then collect a delivery address if one's
+   * still needed). The marker is context for the model, never sent to the customer.
    */
   @callable()
   async checkout(): Promise<Reply[]> {
     this
-      .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify("[The customer tapped Checkout in the storefront — they've finished choosing. Show the order summary and ask them to confirm; no need to ask if they want anything else.]")})`;
+      .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify("[The customer tapped Checkout in the storefront — they've finished adding items, so don't ask if they'd like anything else. Carry on with the order from here.]")})`;
     return this.runModel();
   }
 

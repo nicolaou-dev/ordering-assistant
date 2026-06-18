@@ -51,3 +51,28 @@ orderingEval("happy path -> order submitted", {
   turns: ["pickup, one coca cola", "that's all", "yes, confirm and place it"],
   expected: { state: { empty: true }, submitted: true },
 });
+
+// Checkout shows the item summary first (so they can catch a wrong item before
+// entering an address), then — for delivery — collects the address and places
+// the order on the go-ahead.
+orderingEval("checkout (delivery): summary first, then address, then submit", {
+  turns: [
+    "delivery, one coca cola",
+    { checkout: true },
+    "yep that's right",
+    "12 Oak Street, Springfield, 12345",
+    "yes, go ahead",
+  ],
+  expected: {
+    replies: [{ turn: 1, present: ["order_summary"] }],
+    submitted: true,
+  },
+});
+
+orderingEval("checkout (pickup): summary, then submit on confirm", {
+  turns: ["pickup, one coca cola", { checkout: true }, "yes, place it"],
+  expected: {
+    replies: [{ turn: 1, present: ["order_summary"] }],
+    submitted: true,
+  },
+});

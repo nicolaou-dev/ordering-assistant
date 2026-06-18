@@ -38,10 +38,10 @@ type OrderState = {
   fulfillment: { type: "pickup" | "delivery" | null; address: unknown | null };
 };
 
-// A turn the customer takes: either a typed message (string) or a tapped
-// pickup/delivery button ({ tap }). A tap drives /debug/tap, mirroring the
-// webhook's button-reply path.
-export type Turn = string | { tap: "pickup" | "delivery" };
+// A turn the customer takes: a typed message (string), a tapped pickup/delivery
+// button ({ tap }, drives /debug/tap mirroring the webhook's button-reply path),
+// or the storefront Checkout tap ({ checkout }, drives /debug/checkout).
+export type Turn = string | { tap: "pickup" | "delivery" } | { checkout: true };
 
 // What a case asserts about the conversation it just drove. All fields are
 // serializable so Evalite can show them in the run UI/history.
@@ -90,11 +90,14 @@ async function drive(customer: string, turns: Turn[]): Promise<Convo> {
   const lines: string[] = [];
 
   for (const user of turns) {
-    // A tap drives /debug/tap (button-reply path); a string drives /debug/chat.
-    const [path, payload, label] =
+    // A string drives /debug/chat; a tap drives /debug/tap (button-reply path);
+    // a checkout drives /debug/checkout (storefront Checkout tap).
+    const [path, payload, label]: [string, Record<string, unknown>, string] =
       typeof user === "string"
         ? ["/debug/chat", { instance, message: user }, `Customer: ${user}`]
-        : ["/debug/tap", { instance, type: user.tap }, `Customer tapped: ${user.tap}`];
+        : "checkout" in user
+          ? ["/debug/checkout", { instance }, "Customer tapped: Checkout"]
+          : ["/debug/tap", { instance, type: user.tap }, `Customer tapped: ${user.tap}`];
     const r = await post(path, payload);
     if (!r.ok) throw new Error(`${path} ${r.status}: ${await r.text()}`);
     const turnReplies = ((await r.json()) as { replies: Reply[] }).replies;
@@ -200,7 +203,7 @@ export function orderingEval(name: string, opts: { turns: Turn[]; expected: Spec
     // Readable CLI/UI cell instead of "[object Object]": the reply types per
     // turn, plus whether an order was submitted.
     columns: ({ input, output }) => [
-      { label: "Conversation", value: input.map((t) => (typeof t === "string" ? t : `tap:${t.tap}`)).join("  ›  ") },
+      { label: "Conversation", value: input.map((t) => (typeof t === "string" ? t : "checkout" in t ? "checkout" : `tap:${t.tap}`)).join("  ›  ") },
       { label: "Replies", value: output.replies.map((t) => t.map((r) => r.type).join("+")).join(" | ") },
       { label: "Submitted", value: output.submitted },
     ],
