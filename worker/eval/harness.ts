@@ -26,11 +26,11 @@ export type ReplyType =
   | "menu"
   | "fulfillment_prompt";
 export type Reply =
-  | { type: "text"; body: string }
-  | { type: "order_summary" }
-  | { type: "product_list"; product_ids: string[] }
-  | { type: "menu" }
-  | { type: "fulfillment_prompt" };
+  | { type: "text"; message: string }
+  | { type: "order_summary"; message: string }
+  | { type: "product_list"; product_ids: string[]; message?: string }
+  | { type: "menu"; message: string }
+  | { type: "fulfillment_prompt"; message: string };
 
 type OrderState = {
   items: { product_id: string; qty: number; name: string; unit_price_minor: number }[];
@@ -103,7 +103,7 @@ async function drive(customer: string, turns: Turn[]): Promise<Convo> {
     const turnReplies = ((await r.json()) as { replies: Reply[] }).replies;
     replies.push(turnReplies);
     lines.push(label);
-    for (const rep of turnReplies) lines.push(`Assistant[${rep.type}]: ${"body" in rep ? rep.body : ""}`);
+    for (const rep of turnReplies) lines.push(`Assistant[${rep.type}]: ${rep.message ?? ""}`);
 
     const s = await post("/debug/state", { instance });
     totalsSeen.push((((await s.json()) as OrderState).total_minor));
@@ -118,8 +118,11 @@ async function drive(customer: string, turns: Turn[]): Promise<Convo> {
 // --- graders -----------------------------------------------------------------
 
 const has = (rs: Reply[], t: ReplyType) => rs.some((r) => r.type === t);
+// Every reply carries the model's words in `message` (optional only on
+// product_list), so grounding scans them all — a price the model writes is
+// checked wherever it lands, not just in a plain text reply.
 const texts = (rss: Reply[][]) =>
-  rss.flat().filter((r): r is Extract<Reply, { type: "text" }> => r.type === "text").map((r) => r.body);
+  rss.flat().map((r) => r.message).filter((m): m is string => m != null);
 
 // Outcome grader: per-turn reply types, final order state, and submit. Returns
 // the fraction of checks that passed, with the failures as metadata.

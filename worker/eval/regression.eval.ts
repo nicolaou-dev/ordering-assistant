@@ -11,7 +11,9 @@ orderingEval("greeting: pickup/delivery prompt, no products", {
       {
         turn: 0,
         present: ["fulfillment_prompt"],
-        absent: ["product_list", "menu", "order_summary"],
+        // The greeting rides in the fulfillment_prompt's message, so no separate
+        // text alongside it.
+        absent: ["text", "product_list", "menu", "order_summary"],
       },
     ],
     state: { empty: true },
@@ -30,7 +32,9 @@ orderingEval("tap delivery button: sets fulfillment, continues", {
   turns: [{ tap: "delivery" }],
   expected: {
     state: { fulfillment: "delivery" },
-    replies: [{ turn: 0, present: ["menu"] }],
+    // The "here's the menu" line rides in the menu reply's message, so no
+    // separate text alongside it.
+    replies: [{ turn: 0, present: ["menu"], absent: ["text"] }],
   },
 });
 

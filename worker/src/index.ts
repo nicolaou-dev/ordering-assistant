@@ -42,10 +42,14 @@ async function sendReplies(replies: Reply[], ctx: SendCtx): Promise<void> {
   for (const reply of replies) {
     try {
       if (reply.type === "text") {
-        await client.send(to, reply.body);
+        await client.send(to, reply.message);
       } else if (reply.type === "order_summary") {
-        await client.send(to, await orderSummary());
+        // The hydrated summary (items + total) plus the model's confirm-ask as
+        // one message, so the order asks for itself without a sibling text.
+        await client.send(to, `${await orderSummary()}\n\n${reply.message}`);
       } else if (reply.type === "product_list") {
+        // Optional lead-in line before the product cards.
+        if (reply.message) await client.send(to, reply.message);
         // Hydrate each id from the catalog (scoped to this shop) and send it as a
         // native image + caption, so prices/details come from Postgres, never the
         // model's tokens. One atomic image+caption per product keeps the name,
@@ -73,17 +77,14 @@ async function sendReplies(replies: Reply[], ctx: SendCtx): Promise<void> {
         }
       } else if (reply.type === "menu") {
         // Render as an interactive CTA URL button ("Menu") rather than a text
-        // with the raw link, so the customer taps a button instead of a URL.
-        await client.sendCtaUrl(
-          to,
-          "Browse our full menu and add what you'd like.",
-          "Menu",
-          await menuLink(),
-        );
+        // with the raw link, so the customer taps a button instead of a URL. The
+        // model's words are the button's accompanying text.
+        await client.sendCtaUrl(to, reply.message, "Menu", await menuLink());
       } else if (reply.type === "fulfillment_prompt") {
         // Two tappable buttons instead of a free-text question; the tap comes
-        // back as interactive.button_reply.id and is handled in code.
-        await client.sendReplyButtons(to, "Pickup or delivery?", [
+        // back as interactive.button_reply.id and is handled in code. The model's
+        // words are the body shown above the buttons.
+        await client.sendReplyButtons(to, reply.message, [
           { id: FULFILLMENT_BUTTON.pickup, title: "Pickup" },
           { id: FULFILLMENT_BUTTON.delivery, title: "Delivery" },
         ]);
