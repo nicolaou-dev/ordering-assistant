@@ -21,10 +21,7 @@ export function setAddressTool({
     execute: (fields) => {
       const result = setAddress(fields);
       if ("error" in result) return result;
-      return {
-        address: result,
-        next: "Read the saved address back to the customer as labelled lines — Address 1, City, Postcode, plus Address 2 and Notes when each is present — then ask them to confirm it's right before continuing.",
-      };
+      return { address: result };
     },
   });
 }

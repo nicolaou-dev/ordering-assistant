@@ -55,11 +55,16 @@ intuition. Check those before reshaping the prompt or tools.
 
 - **Small and high-signal, not just short.** Cut redundant restatement, keep
   concrete signal. Vague guidance is as bad as an over-prescriptive rulebook.
-- **Steer just-in-time, not up front.** Put situational guidance where the model
-  reads it the moment it matters: a `next` hint on a tool's return (e.g.
-  `query_data` keys advice on row count) and the order snapshot's `Next:` line for
-  the macro flow. The static prompt holds the role, a few heuristics, and
-  examples — not a per-situation rulebook.
+- **Let the model reason; don't script the macro flow.** A `next` hint on a
+  tool's return works well for *local* guidance the moment it matters — what to do
+  with the rows `query_data` found, or to read an address back after
+  `set_address`. What hurt was scripting the *whole conversation* that way: a
+  per-turn `Next:` line that grew into a "do X when Y" rulebook, fighting the
+  model's own reasoning and leaving it stuck when a chat went off-script. So the
+  order's shape lives in a short `<flow>` block and the live `## Current order`
+  snapshot (rendered from state each turn) shows where the model is; tactical
+  coaching stays on tool returns. The static prompt holds the role, grounding, the
+  flow, the reply types, and a few examples.
 - **Say what TO do, not what NOT to do**, and drop emphatic caps ("NEVER/MUST").
   Haiku 4.5 follows precise, calm instructions and overtriggers on shouting.
 - **Examples beat prose.** A few canonical `<example>`s steer a small model
@@ -73,6 +78,9 @@ intuition. Check those before reshaping the prompt or tools.
 - **Measure, don't eyeball.** Validate prompt/behaviour changes against the eval
   harness rather than a single `/debug/chat` run. The eval that pins a behaviour
   change lands in the same ticket that makes the change — scope and acceptance —
-  not a separate "update evals" ticket. Deterministic outcomes (state,
-  `submitted`, reply types) go in `regression.eval.ts`; wording/qualitative
-  checks go in `capability.eval.ts` as a `rubric`.
+  not a separate "update evals" ticket. `regression.eval.ts` holds the gated
+  end-to-end flows, asserting deterministic outcomes (state, `submitted`,
+  grounding) over realistic conversations — not the reply type the model picks
+  each turn, which would just re-script it. Wording/qualitative checks attach to
+  a case as a `rubric` (judged by a separate model); keep those out of the gate,
+  since a single judged run is a noisy sample.

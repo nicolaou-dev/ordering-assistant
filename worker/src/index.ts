@@ -7,7 +7,6 @@ import { verifySignature } from "./verify";
 import { mintCartToken, verifyCartToken } from "./cart_token";
 import z from "zod";
 import { createClient } from "./whatsapp/client";
-import { formatOrderSummary } from "./whatsapp/summary";
 import { formatProductCaption, type ProductRow } from "./whatsapp/product";
 import { createAdminDb, createDb, withShop, type Sql } from "./db";
 import type { Reply } from "./reply";
@@ -19,34 +18,22 @@ export { OrderAgent };
 
 // Deliver the agent's replies to one customer over WhatsApp. Shared by the
 // inbound webhook and the storefront checkout endpoint so both render replies
-// identically (text / hydrated order summary / product images). Send failures
-// are logged, not thrown — one failed message must not drop the rest.
+// identically (text / product images / menu link). Send failures are logged,
+// not thrown — one failed message must not drop the rest.
 type SendCtx = {
   client: ReturnType<typeof createClient>;
   to: string;
   sql: Sql;
   shopId: string;
-  orderSummary: () => Promise<string>;
   menuLink: () => Promise<string>;
 };
 
-// Button ids for the pickup/delivery prompt. Shared by the render (sendReplies)
-// and the inbound tap handler so a tap maps back to a fulfillment type in code.
-const FULFILLMENT_BUTTON = {
-  pickup: "fulfillment:pickup",
-  delivery: "fulfillment:delivery",
-} as const;
-
 async function sendReplies(replies: Reply[], ctx: SendCtx): Promise<void> {
-  const { client, to, sql, shopId, orderSummary, menuLink } = ctx;
+  const { client, to, sql, shopId, menuLink } = ctx;
   for (const reply of replies) {
     try {
       if (reply.type === "text") {
         await client.send(to, reply.message);
-      } else if (reply.type === "order_summary") {
-        // The hydrated summary (items + total) plus the model's confirm-ask as
-        // one message, so the order asks for itself without a sibling text.
-        await client.send(to, `${await orderSummary()}\n\n${reply.message}`);
       } else if (reply.type === "product_list") {
         // Optional lead-in line before the product cards.
         if (reply.message) await client.send(to, reply.message);
@@ -80,14 +67,6 @@ async function sendReplies(replies: Reply[], ctx: SendCtx): Promise<void> {
         // with the raw link, so the customer taps a button instead of a URL. The
         // model's words are the button's accompanying text.
         await client.sendCtaUrl(to, reply.message, "Menu", await menuLink());
-      } else if (reply.type === "fulfillment_prompt") {
-        // Two tappable buttons instead of a free-text question; the tap comes
-        // back as interactive.button_reply.id and is handled in code. The model's
-        // words are the body shown above the buttons.
-        await client.sendReplyButtons(to, reply.message, [
-          { id: FULFILLMENT_BUTTON.pickup, title: "Pickup" },
-          { id: FULFILLMENT_BUTTON.delivery, title: "Delivery" },
-        ]);
       }
     } catch (e) {
       console.error("sendReplies: failed to send a reply", {
@@ -135,16 +114,6 @@ const Value = z.object({
         id: z.string(),
         type: z.string(),
         text: z.object({ body: z.string() }).optional(),
-        // A tapped reply button (e.g. the pickup/delivery prompt): the id is the
-        // one we set when sending the buttons.
-        interactive: z
-          .object({
-            type: z.string(),
-            button_reply: z
-              .object({ id: z.string(), title: z.string() })
-              .optional(),
-          })
-          .optional(),
       }),
     )
     .nonempty(),
@@ -174,9 +143,8 @@ app.post("/webhook/whatsapp", async (c) => {
   }
 
   const { phone_number_id } = parsed.data.metadata;
-  const { from, id, text, interactive } = parsed.data.messages[0];
+  const { from, id, text } = parsed.data.messages[0];
   const sessionKey = `${phone_number_id}:${from}`;
-  const buttonId = interactive?.button_reply?.id;
 
   const handleInbound = async () => {
     const result = await c.env.DB.prepare(
@@ -190,10 +158,10 @@ app.post("/webhook/whatsapp", async (c) => {
       return;
     }
 
-    console.log("inbound", { from, id, text: text?.body, buttonId });
+    console.log("inbound", { from, id, text: text?.body });
 
-    // Either a typed message or a tapped button; ignore anything else.
-    if (!text?.body && !buttonId) return;
+    // Only typed messages drive a turn; ignore anything else.
+    if (!text?.body) return;
 
     const client = createClient(settings);
 
@@ -205,27 +173,13 @@ app.post("/webhook/whatsapp", async (c) => {
     });
 
     const stub = await getAgentByName(c.env.OrderAgent, sessionKey);
-    // A tapped pickup/delivery button sets fulfillment in code, then runs a turn
-    // off an internal marker — the model never re-parses the choice. A typed
-    // message runs the normal turn. An unrecognised button is ignored.
-    let replies: Reply[];
-    if (buttonId === FULFILLMENT_BUTTON.pickup) {
-      replies = await stub.tapFulfillment("pickup");
-    } else if (buttonId === FULFILLMENT_BUTTON.delivery) {
-      replies = await stub.tapFulfillment("delivery");
-    } else if (buttonId) {
-      console.log("unhandled button id", { buttonId });
-      return;
-    } else {
-      replies = await stub.runTurn(text!.body);
-    }
+    const replies = await stub.runTurn(text.body);
 
     await sendReplies(replies, {
       client,
       to: from,
       sql: createDb(settings),
       shopId: phone_number_id,
-      orderSummary: async () => formatOrderSummary(await stub.getOrderState()),
       menuLink: async () =>
         `${settings.STOREFRONT_URL}/?t=${await mintCartToken(phone_number_id, from, settings.WHATSAPP_APP_SECRET)}`,
     });
@@ -463,7 +417,6 @@ app.post("/orders/:order_id/approve", async (c) => {
       to: customer,
       sql,
       shopId,
-      orderSummary: async () => formatOrderSummary(await stub.getOrderState()),
       menuLink: async () =>
         `${settings.STOREFRONT_URL}/?t=${await mintCartToken(shopId, customer, settings.WHATSAPP_APP_SECRET)}`,
     });
@@ -506,19 +459,6 @@ app.post("/debug/chat", async (c) => {
   return c.json({ replies });
 });
 
-// Debug seam for a pickup/delivery button tap, mirroring the webhook's
-// button-reply path (set fulfillment in code, then a continuation turn) without
-// the WhatsApp signature/D1 plumbing — so the eval harness can drive a tap.
-app.post("/debug/tap", async (c) => {
-  const { instance, type } = await c.req.json<{
-    instance: string;
-    type: "pickup" | "delivery";
-  }>();
-  const stub = await getAgentByName(c.env.OrderAgent, instance);
-  const replies = await stub.tapFulfillment(type);
-  return c.json({ replies });
-});
-
 // Debug seam for the storefront Checkout tap, mirroring /cart/checkout's
 // continuation turn without the cart-token plumbing — so the eval harness can
 // drive a checkout.
@@ -527,16 +467,6 @@ app.post("/debug/checkout", async (c) => {
   const stub = await getAgentByName(c.env.OrderAgent, instance);
   const replies = await stub.checkout();
   return c.json({ replies });
-});
-
-// Debug-only stand-in for the send-time render of an order_summary reply: shows
-// the hydrated, customer-facing summary the channel would send, so hydration is
-// testable without WhatsApp.
-app.post("/debug/summary", async (c) => {
-  const { instance } = await c.req.json<{ instance: string }>();
-  const stub = await getAgentByName(c.env.OrderAgent, instance);
-  const summary = formatOrderSummary(await stub.getOrderState());
-  return c.json({ summary });
 });
 
 // Raw draft order state for an agent instance — the eval harness reads this to
@@ -666,7 +596,6 @@ app.post("/cart/checkout", async (c) => {
     to: claims.customer,
     sql: createDb(settings),
     shopId: claims.shopId,
-    orderSummary: async () => formatOrderSummary(await stub.getOrderState()),
     menuLink: async () =>
       `${settings.STOREFRONT_URL}/?t=${await mintCartToken(claims.shopId, claims.customer, settings.WHATSAPP_APP_SECRET)}`,
   });

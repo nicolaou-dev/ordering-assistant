@@ -9,7 +9,6 @@ import {
   addItem as addItemToOrder,
   removeItem as removeItemFromOrder,
   setAddress,
-  setFulfillment,
   emptyOrder,
   renderOrderSnapshot,
   type OrderState,
@@ -68,29 +67,14 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
    * The customer tapped Checkout in the storefront. A deterministic trigger,
    * not a typed message: drop an internal marker recording the one fact the
    * order state can't express — they've finished adding items, so don't ask
-   * "anything else?" — and let the snapshot's Next hint own what follows
-   * (confirm the items via the summary, then collect a delivery address if one's
-   * still needed). The marker is context for the model, never sent to the customer.
+   * "anything else?" — and let the prompt's <flow> take it from there (confirm
+   * the order, address if delivery, then submit). The marker is context for the
+   * model, never sent to the customer.
    */
   @callable()
   async checkout(): Promise<Reply[]> {
     this
       .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify("[The customer tapped Checkout in the storefront — they've finished adding items, so don't ask if they'd like anything else. Carry on with the order from here.]")})`;
-    return this.runModel();
-  }
-
-  /**
-   * The customer tapped the Pickup or Delivery button. A deterministic trigger,
-   * not a typed message: set fulfillment in code (the model never re-parses the
-   * choice), drop an internal marker, then run one turn so the model carries on
-   * (e.g. sends the menu). The marker is context for the model, never sent to
-   * the customer.
-   */
-  @callable()
-  async tapFulfillment(type: "pickup" | "delivery"): Promise<Reply[]> {
-    this.setState(setFulfillment(this.state, type));
-    this
-      .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify(`[The customer tapped "${type}" — fulfillment is now set to ${type}. Carry on from here.]`)})`;
     return this.runModel();
   }
 
@@ -110,10 +94,9 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   }
 
   /**
-   * Return the draft order for the harness to render an order_summary reply.
-   * The model only signals "show it"; the channel adapter reads the stored
-   * state (items + fulfillment + total, all catalog-sourced at add_item time)
-   * and formats it, so nothing in the summary comes from model output.
+   * The current draft order state. Read by the storefront cart endpoints and the
+   * debug/state seam; the order snapshot the model sees is rendered from this
+   * same state each turn, so it's the single source of truth for the order.
    */
   @callable()
   getOrderState(): OrderState {

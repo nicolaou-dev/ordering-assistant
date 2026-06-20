@@ -6,19 +6,26 @@ export function submitOrderTool({
   submitOrder,
 }: {
   submitOrder: () => Promise<
-    { order_id: string; total_minor: number; currency: string } | { error: string }
+    | { order_id: string; total_minor: number; currency: string }
+    | { error: string }
   >;
 }) {
   return tool({
     description:
-      "Place the order after the customer has confirmed the summary. Validates the order and re-checks every item against the live catalog, then writes it for the shop to approve. Returns { order_id, total_minor, currency } on success, or an error to relay — missing details, or items whose price or stock changed (fix those and re-confirm, then try again).",
+      "Place the order after the customer has confirmed it. Validates the order and re-checks every item against the live catalog, then writes it for the shop to approve. Returns { order_id, total_minor, currency } on success, or an error — missing details, or items whose price or stock changed.",
     inputSchema: z.object({}),
     execute: async () => {
       const result = await submitOrder();
-      if ("error" in result) return result;
+      if (!("error" in result)) return result;
+      // The error names what's missing or stale — e.g. fulfillment not recorded
+      // (call set_fulfillment), no delivery address (set_address), or a price/stock
+      // change. Fix that cause and retry here, in this same turn, rather than
+      // handing the work to a later turn. Mirrors <turn>: the customer hears from
+      // you once there's a result, so resolve it before replying.
       return {
         ...result,
-        next: "Tell the customer their order has been sent to the shop for approval and they'll get a message once it's confirmed; include the total (total_minor is minor units, e.g. 850 = 8.50). order_id is an internal reference — don't read it out.",
+        recover:
+          "Fix the cause this error names and call submit_order again in this same turn. If fixing it needs something only the customer can give, ask them for it. Reply only with a real outcome or that ask, never a holding message.",
       };
     },
   });

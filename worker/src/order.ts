@@ -90,7 +90,11 @@ export function addItem(
   const existing = items.find((i) => i.product_id === product.product_id);
   if (existing) existing.qty += qty;
   else items.push({ ...product, qty });
-  return { ...state, items, total_minor: state.total_minor + qty * product.unit_price_minor };
+  return {
+    ...state,
+    items,
+    total_minor: state.total_minor + qty * product.unit_price_minor,
+  };
 }
 
 /**
@@ -113,63 +117,37 @@ export function removeItem(
       i.qty -= removed;
       return i.qty > 0;
     });
-  return { ...state, items, total_minor: state.total_minor - removed * existing.unit_price_minor };
+  return {
+    ...state,
+    items,
+    total_minor: state.total_minor - removed * existing.unit_price_minor,
+  };
 }
 
 /**
  * Render the live order state as a compact, clearly-labelled block for the
  * model. Prepended after the static prompt each turn so the model always reads
- * THE current order it is completing. Amounts are raw minor units (cents) —
- * the same representation query_data returns for price_minor — so the model
- * never reconciles two money formats. Status is "draft" until later tickets
- * add submission.
+ * THE current order it is completing, and which step of the prompt's <flow> it
+ * is on (fulfillment chosen? address saved? items added?). Amounts are raw minor
+ * units (cents) — the same representation query_data returns for price_minor —
+ * so the model never reconciles two money formats. Status is "draft" until
+ * submitted.
  */
 export function renderOrderSnapshot(state: OrderState): string {
   const { type, address } = state.fulfillment;
-  const fulfillment = type ?? "not set yet";
+  const fulfillment = type ?? "not set yet. Set using set_fulfillment";
   let header = `## Current order\n\nStatus: draft\nFulfillment: ${fulfillment}`;
   // Delivery needs an address; pickup shows no address line at all.
   if (type === "delivery") {
     header += `\nAddress: ${address ? formatAddress(address) : "needed"}`;
   }
-  const next = `\n\nNext: ${nextStep(state)}`;
   if (state.items.length === 0) {
-    return `${header}\n\n(empty — no items added yet)${next}`;
+    return `${header}\n\n(empty — no items added yet)`;
   }
   const currency = state.items[0].currency;
   const lines = state.items.map((i) => {
     const lineTotal = i.unit_price_minor * i.qty;
     return `- ${i.qty} x ${i.name} @ ${i.unit_price_minor} = ${lineTotal}`;
   });
-  return `${header}\nCurrency: ${currency} (all amounts below are price_minor — minor units, e.g. 850 = 8.50)\n\n${lines.join("\n")}\n\nOrder total: ${state.total_minor}${next}`;
-}
-
-// A one-line heuristic for the likely next step, derived from the order state.
-// It's a guide for the model, not a command — a clear request from the customer
-// (e.g. naming an item up front) takes priority over the suggested step.
-function nextStep(state: OrderState): string {
-  const { type, address } = state.fulfillment;
-  const hasItems = state.items.length > 0;
-  if (!type) {
-    return hasItems
-      ? "ask whether it's pickup or delivery with a fulfillment_prompt."
-      : "greet the customer and ask whether it's pickup or delivery with a fulfillment_prompt — unless they've named an item to order, in which case look it up.";
-  }
-  if (!hasItems) {
-    return "send the menu so they can browse and add items.";
-  }
-  // The order has items: don't rush ahead. Check they're done first, then
-  // confirm the items with the summary. Show it, ask, and wait — the order is
-  // placed only once the customer confirms and submit_order succeeds, so avoid
-  // "placed/done" language before that. A delivery address (if still needed) is
-  // collected after the items are confirmed, not before — the summary's job is
-  // to confirm what they picked, and the address has its own read-back, which
-  // doubles as the go-ahead to place the order.
-  const summaryStep =
-    "send the order_summary with a short text asking them to confirm it, and wait for their reply";
-  const finish =
-    type === "delivery" && !address
-      ? `${summaryStep}. Once they confirm the items, collect the delivery address with set_address; with the address read back and confirmed, tell them you're set to deliver there and ask for the go-ahead to place the order, then place it with submit_order once they give it`
-      : `${summaryStep} — place it with submit_order only once they've confirmed`;
-  return `ask if they'd like anything else; once they're done, ${finish}.`;
+  return `${header}\nCurrency: ${currency} (all amounts below are price_minor — minor units, e.g. 850 = 8.50)\n\n${lines.join("\n")}\n\nOrder total: ${state.total_minor}`;
 }
