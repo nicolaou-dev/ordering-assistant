@@ -81,6 +81,7 @@ No tool changes prices, so you say what's true rather than offering to sort it o
  */
 export function system(
   { shopName, categories }: ShopContext,
+  lastOrder: string,
   orderSnapshot: string,
 ): string {
   const sorted = [...categories].sort((a, b) =>
@@ -92,6 +93,11 @@ export function system(
     categories.length === 0
       ? ""
       : `\n\n## This shop\n\n${name}Categories (item counts):\n${list}`;
+  // The last order (per-customer, stable for the conversation) sits after the
+  // per-shop block and before the volatile draft snapshot, so the cache-friendly
+  // ordering holds: static rules, then shop, then customer history, then the
+  // order that changes each turn. Empty string for a first-timer.
+  const lastOrderBlock = lastOrder ? `\n\n${lastOrder}` : "";
 
-  return `${STATIC}${shopBlock}\n\n${orderSnapshot}`;
+  return `${STATIC}${shopBlock}${lastOrderBlock}\n\n${orderSnapshot}`;
 }

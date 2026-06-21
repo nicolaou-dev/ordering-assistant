@@ -11,8 +11,10 @@ import {
   setAddress,
   emptyOrder,
   renderOrderSnapshot,
+  renderLastOrder,
   type OrderState,
   type Address,
+  type RecentOrder,
 } from "./order";
 import {
   queryDataTool,
@@ -367,15 +369,31 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       submitOrder: () => this.submitOrder(),
     });
 
-    // One scoped read per turn: shop name + categories with item counts. RLS
-    // already limits both to this shop, so neither query needs a shop_id filter.
-    const [nameRows, catRows] = await withShop(db, this.shopId, [
-      db`SELECT name FROM shops`,
-      db`SELECT category, count(*)::int AS count
-         FROM products WHERE deleted_at IS NULL GROUP BY category`,
-    ]);
+    // One scoped read per turn: shop name + categories with item counts, plus
+    // this customer's most recent order for the prompt's context block. Scoped to
+    // shop AND customer (the orders policy needs app.customer_id), so no table
+    // needs an explicit filter. The last-order join returns at most one row.
+    const [nameRows, catRows, lastOrderRows] = await withShopCustomer(
+      db,
+      this.shopId,
+      this.customer,
+      [
+        db`SELECT name FROM shops`,
+        db`SELECT category, count(*)::int AS count
+           FROM products WHERE deleted_at IS NULL GROUP BY category`,
+        db`SELECT o.created_at, o.status, o.fulfillment_type,
+                 jsonb_agg(jsonb_build_object('name', i.name, 'qty', i.qty)
+                           ORDER BY i.name) AS items
+           FROM orders o
+           JOIN order_items i ON i.order_id = o.order_id
+           GROUP BY o.order_id, o.created_at, o.status, o.fulfillment_type
+           ORDER BY o.created_at DESC
+           LIMIT 1`,
+      ],
+    );
     const shopName = (nameRows[0]?.name as string | undefined) ?? null;
     const categories = catRows as { category: string; count: number }[];
+    const lastOrder = (lastOrderRows[0] as RecentOrder | undefined) ?? null;
 
     const model = createAnthropic({ apiKey: settings.ANTHROPIC_API_KEY })(
       "claude-haiku-4-5",
@@ -393,7 +411,11 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
 
     const { output: replies, response } = await generateText({
       model,
-      system: system({ shopName, categories }, renderOrderSnapshot(this.state)),
+      system: system(
+        { shopName, categories },
+        renderLastOrder(lastOrder),
+        renderOrderSnapshot(this.state),
+      ),
       messages,
       output,
       tools: {

@@ -151,3 +151,40 @@ export function renderOrderSnapshot(state: OrderState): string {
   });
   return `${header}\nCurrency: ${currency} (all amounts below are price_minor — minor units, e.g. 850 = 8.50)\n\n${lines.join("\n")}\n\nOrder total: ${state.total_minor}`;
 }
+
+/** The customer's most recent submitted order, read back from the DB for the
+ * prompt. Distinct from OrderState — it's history, not the draft being built. */
+export type RecentOrder = {
+  // timestamptz — the neon driver hands this back as a Date, not a string.
+  created_at: string | Date;
+  status: string;
+  fulfillment_type: "pickup" | "delivery";
+  items: { name: string; qty: number }[];
+};
+
+// How long ago, in words a customer would use. Whole-day granularity (UTC) is
+// enough for "welcome back" framing; exact times aren't useful in the prompt.
+function relativeDay(then: Date): string {
+  const day = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  const days = Math.floor((day(new Date()) - day(then)) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  return `${days} days ago`;
+}
+
+/**
+ * A compact, read-only block on the customer's most recent order, injected so a
+ * returning customer is greeted with awareness and the agent can speak to an
+ * in-flight order (its status) without a tool call. Deliberately lean: no prices
+ * (they go stale and the model must never quote an old one as current) and no
+ * address (its own ticket) — just what they got, when, where it stands, and
+ * pickup/delivery. Reordering or quoting prices goes through the tools, which
+ * re-read the live catalog. Returns "" for a first-timer (no block).
+ */
+export function renderLastOrder(order: RecentOrder | null): string {
+  if (!order) return "";
+  const lines = order.items.map((i) => `- ${i.qty} x ${i.name}`).join("\n");
+  const when = new Date(order.created_at);
+  const placed = `${when.toISOString().slice(0, 10)} (${relativeDay(when)})`;
+  return `## Customer's last order\n\nPlaced: ${placed}\nStatus: ${order.status.replace(/_/g, " ")}\nFulfillment: ${order.fulfillment_type}\n\n${lines}`;
+}
