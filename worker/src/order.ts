@@ -159,6 +159,11 @@ export type RecentOrder = {
   created_at: string | Date;
   status: string;
   fulfillment_type: "pickup" | "delivery";
+  // The delivery address used last time, for the agent to offer again. null for
+  // pickup orders (nothing to reuse). Read-only context — offering it is not
+  // pre-filling the draft; set_address still writes OrderState.address only on
+  // the customer's explicit confirmation.
+  address: Address | null;
   items: { name: string; qty: number }[];
 };
 
@@ -175,16 +180,21 @@ function relativeDay(then: Date): string {
 /**
  * A compact, read-only block on the customer's most recent order, injected so a
  * returning customer is greeted with awareness and the agent can speak to an
- * in-flight order (its status) without a tool call. Deliberately lean: no prices
- * (they go stale and the model must never quote an old one as current) and no
- * address (its own ticket) — just what they got, when, where it stands, and
- * pickup/delivery. Reordering or quoting prices goes through the tools, which
- * re-read the live catalog. Returns "" for a first-timer (no block).
+ * in-flight order (its status) without a tool call, and offer the same
+ * fulfillment again. Deliberately lean: no prices (they go stale and the model
+ * must never quote an old one as current) — just what they got, when, where it
+ * stands, pickup/delivery, and the delivery address to offer back. Reordering or
+ * quoting prices goes through the tools, which re-read the live catalog. Returns
+ * "" for a first-timer (no block).
  */
 export function renderLastOrder(order: RecentOrder | null): string {
   if (!order) return "";
   const lines = order.items.map((i) => `- ${i.qty} x ${i.name}`).join("\n");
   const when = new Date(order.created_at);
   const placed = `${when.toISOString().slice(0, 10)} (${relativeDay(when)})`;
-  return `## Customer's last order\n\nPlaced: ${placed}\nStatus: ${order.status.replace(/_/g, " ")}\nFulfillment: ${order.fulfillment_type}\n\n${lines}`;
+  const address =
+    order.fulfillment_type === "delivery" && order.address
+      ? `\nDelivered to: ${formatAddress(order.address)}`
+      : "";
+  return `## Customer's last order\n\nPlaced: ${placed}\nStatus: ${order.status.replace(/_/g, " ")}\nFulfillment: ${order.fulfillment_type}${address}\n\n${lines}`;
 }

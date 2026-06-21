@@ -382,11 +382,19 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
         db`SELECT category, count(*)::int AS count
            FROM products WHERE deleted_at IS NULL GROUP BY category`,
         db`SELECT o.created_at, o.status, o.fulfillment_type,
+                 CASE WHEN o.fulfillment_type = 'delivery' AND o.address_line1 IS NOT NULL
+                   THEN jsonb_build_object(
+                          'line1', o.address_line1, 'line2', o.address_line2,
+                          'city', o.address_city, 'postcode', o.address_postcode,
+                          'notes', o.address_notes)
+                   ELSE NULL END AS address,
                  jsonb_agg(jsonb_build_object('name', i.name, 'qty', i.qty)
                            ORDER BY i.name) AS items
            FROM orders o
            JOIN order_items i ON i.order_id = o.order_id
-           GROUP BY o.order_id, o.created_at, o.status, o.fulfillment_type
+           GROUP BY o.order_id, o.created_at, o.status, o.fulfillment_type,
+                    o.address_line1, o.address_line2, o.address_city,
+                    o.address_postcode, o.address_notes
            ORDER BY o.created_at DESC
            LIMIT 1`,
       ],
