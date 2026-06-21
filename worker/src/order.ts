@@ -155,6 +155,10 @@ export function renderOrderSnapshot(state: OrderState): string {
 /** The customer's most recent submitted order, read back from the DB for the
  * prompt. Distinct from OrderState — it's history, not the draft being built. */
 export type RecentOrder = {
+  // order_id == the draft_id the order was built under (set at submit), so it
+  // doubles as the key for loading that order's chat from the message log. Used
+  // internally for the conversation window; never rendered to the customer.
+  order_id: string;
   // timestamptz — the neon driver hands this back as a Date, not a string.
   created_at: string | Date;
   status: string;

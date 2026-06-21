@@ -26,6 +26,10 @@ import {
   submitOrderTool,
 } from "./tools";
 
+// Order statuses past which the conversation window stops carrying that order:
+// once it's delivered (completed) or rejected, a new message starts clean.
+const TERMINAL_STATUSES = new Set(["completed", "rejected"]);
+
 export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   initialState: OrderState = emptyOrder;
 
@@ -320,8 +324,12 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       };
     }
 
-    const orderId = crypto.randomUUID();
-    const idempotencyKey = `${this.name}:${state.draftId}`;
+    // The order id IS the draft_id it was built under, so the order row records
+    // which conversation produced it — the window can reload that order's chat by
+    // order_id. draftId is set whenever there are items (guarded above), so this
+    // is non-null here.
+    const orderId = state.draftId;
+    if (!orderId) return { error: "No draft to submit." };
     const currency = items[0].currency;
     const total = items.reduce((s, i) => s + i.unit_price_minor * i.qty, 0);
     const addr = state.fulfillment.address;
@@ -333,12 +341,12 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
         db`INSERT INTO orders (
              order_id, shop_id, customer_phone, fulfillment_type,
              address_line1, address_line2, address_city, address_postcode, address_notes,
-             currency, total_minor, idempotency_key
+             currency, total_minor
            ) VALUES (
              ${orderId}, ${this.shopId}, ${this.customer}, ${state.fulfillment.type},
              ${addr?.line1 ?? null}, ${addr?.line2 ?? null}, ${addr?.city ?? null},
              ${addr?.postcode ?? null}, ${addr?.notes ?? null},
-             ${currency}, ${total}, ${idempotencyKey}
+             ${currency}, ${total}
            )`,
         ...items.map(
           (i) =>
@@ -349,9 +357,9 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
         ),
       ]);
     } catch (e) {
-      // A retried submit of the same draft hits idempotency_key UNIQUE (23505):
-      // the order already exists, so return it instead of erroring or writing
-      // twice.
+      // A retried submit of the same draft hits the order_id primary key (23505)
+      // — order_id IS the draft_id, so re-submitting the same draft collides.
+      // Return the existing order instead of erroring or writing twice.
       if ((e as { code?: string }).code === "23505") {
         const [existing] = await withShopCustomer(
           db,
@@ -359,7 +367,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
           this.customer,
           [
             db`SELECT order_id, total_minor, currency
-             FROM orders WHERE idempotency_key = ${idempotencyKey}`,
+             FROM orders WHERE order_id = ${orderId}`,
           ],
         );
         const row = existing[0] as
@@ -416,7 +424,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
         db`SELECT name FROM shops`,
         db`SELECT category, count(*)::int AS count
            FROM products WHERE deleted_at IS NULL GROUP BY category`,
-        db`SELECT o.created_at, o.status, o.fulfillment_type,
+        db`SELECT o.order_id, o.created_at, o.status, o.fulfillment_type,
                  CASE WHEN o.fulfillment_type = 'delivery' AND o.address_line1 IS NOT NULL
                    THEN jsonb_build_object(
                           'line1', o.address_line1, 'line2', o.address_line2,
@@ -442,15 +450,24 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       "claude-haiku-4-5",
     );
 
-    // The session's draft_id, set by the entry point before this runs. Captured
-    // once: submit_order may clear it mid-turn, but the user message and this
-    // turn's replies all belong to the same session, so they share this id and
-    // the next turn (a fresh draft_id) starts with a clean window.
+    // The current draft's id, set by the entry point before this runs. Captured
+    // once: submit_order may clear it mid-turn, but this turn's user message and
+    // replies all belong to it, so they share this id.
     const draftId = this.state.draftId;
-    const rows = this.sql<{
-      role: string;
-      content: string;
-    }>`SELECT role, content FROM messages WHERE draft_id = ${draftId} ORDER BY id`;
+    // Conversation window: the current draft's messages, plus the last order's
+    // while that order is still in flight (not delivered/rejected) — so a
+    // post-submit "thanks" / "is it ready?" still sees the placed order.
+    // order_id == that order's draft_id (the same key its messages carry), and
+    // ORDER BY id keeps the prev-order chat ahead of the current draft's. Once
+    // the order is terminal, prevId is null — and IN (NULL, draftId) matches the
+    // same rows as = draftId, so the window cleanly narrows to the current draft.
+    const prevId =
+      lastOrder && !TERMINAL_STATUSES.has(lastOrder.status)
+        ? lastOrder.order_id
+        : null;
+    const rows = this.sql<{ role: string; content: string }>`
+      SELECT role, content FROM messages
+      WHERE draft_id IN (${prevId}, ${draftId}) ORDER BY id`;
 
     const messages = rows.map((r) => ({
       role: r.role,
