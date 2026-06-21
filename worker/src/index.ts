@@ -147,13 +147,19 @@ app.post("/webhook/whatsapp", async (c) => {
   const sessionKey = `${phone_number_id}:${from}`;
 
   const handleInbound = async () => {
-    const result = await c.env.DB.prepare(
-      "INSERT OR IGNORE INTO inbound_messages(message_id, received_at) VALUES (?, ?)",
-    )
-      .bind(id, Date.now())
-      .run();
+    // Webhook idempotency on Neon (one datastore now D1 is gone): WhatsApp
+    // delivers each event at least once, so record every message_id and skip
+    // repeats. The table is global — message_id is unique across the whole WABA —
+    // so it has no RLS and is written by the admin/owner role; loop_agent (the
+    // RLS-scoped shop reader) never touches it. A new row back means first
+    // delivery; ON CONFLICT DO NOTHING returning nothing means a duplicate.
+    const db = createAdminDb(settings);
+    const [seen] = await db`
+      INSERT INTO inbound_messages (message_id) VALUES (${id})
+      ON CONFLICT (message_id) DO NOTHING
+      RETURNING message_id`;
 
-    if (result.meta.changes === 0) {
+    if (!seen) {
       console.log("deduped", { id });
       return;
     }

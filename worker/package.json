@@ -5,7 +5,6 @@
     "predev": "pnpm cf-typegen",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy --minify",
-    "d1:migrate": "wrangler d1 migrations apply loop",
     "db:migrate": "node --env-file=.dev.vars node_modules/node-pg-migrate/bin/node-pg-migrate.js up -m db/migrations -d DATABASE_URL_ADMIN",
     "db:migrate:down": "node --env-file=.dev.vars node_modules/node-pg-migrate/bin/node-pg-migrate.js down -m db/migrations -d DATABASE_URL_ADMIN",
     "db:migrate:new": "node-pg-migrate create -m db/migrations -j sql",

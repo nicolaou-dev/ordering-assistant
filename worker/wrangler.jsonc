@@ -25,14 +25,7 @@
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["OrderAgent"] }
-  ],
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "loop",
-			"database_id": "6d39e65d-6d78-41d0-a3d5-a33db5466e6e"
-		}
-	]
+  ]
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
