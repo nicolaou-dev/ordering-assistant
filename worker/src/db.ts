@@ -39,3 +39,26 @@ export async function withShop(
   ]);
   return results.slice(1) as Record<string, any>[][];
 }
+
+/**
+ * Run queries scoped to one shop AND one customer under row-level security.
+ *
+ * Same mechanism as withShop, with a second transaction-local GUC: orders /
+ * order_items policies require both app.shop_id and app.customer_id, so the
+ * agent reads only this customer's order history and writes orders only for
+ * this customer (the INSERT's WITH CHECK matches customer_phone to the GUC).
+ * Either GUC unset reads as NULL → matches nothing → fail-closed.
+ */
+export async function withShopCustomer(
+  sql: Sql,
+  shopId: string,
+  customerId: string,
+  queries: NeonQueryPromise<false, false>[],
+): Promise<Record<string, any>[][]> {
+  const results = await sql.transaction([
+    sql`SELECT set_config('app.shop_id', ${shopId}, true)`,
+    sql`SELECT set_config('app.customer_id', ${customerId}, true)`,
+    ...queries,
+  ]);
+  return results.slice(2) as Record<string, any>[][];
+}

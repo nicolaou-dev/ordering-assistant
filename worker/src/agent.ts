@@ -3,7 +3,7 @@ import { generateText, Output, stepCountIs, type ModelMessage } from "ai";
 import { Reply } from "./reply";
 import { Agent, callable } from "agents";
 import { getSettings } from "./settings";
-import { createDb, withShop } from "./db";
+import { createDb, withShop, withShopCustomer } from "./db";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import {
   addItem as addItemToOrder,
@@ -16,6 +16,7 @@ import {
 } from "./order";
 import {
   queryDataTool,
+  pastOrdersTool,
   addItemTool,
   removeItemTool,
   setFulfillmentTool,
@@ -294,7 +295,9 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     const addr = state.fulfillment.address;
 
     try {
-      await withShop(db, this.shopId, [
+      // The orders policy is customer-scoped, so the INSERT's WITH CHECK matches
+      // the new row's customer_phone against app.customer_id — set both GUCs.
+      await withShopCustomer(db, this.shopId, this.customer, [
         db`INSERT INTO orders (
              order_id, shop_id, customer_phone, fulfillment_type,
              address_line1, address_line2, address_city, address_postcode, address_notes,
@@ -318,7 +321,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       // the order already exists, so return it instead of erroring or writing
       // twice.
       if ((e as { code?: string }).code === "23505") {
-        const [existing] = await withShop(db, this.shopId, [
+        const [existing] = await withShopCustomer(db, this.shopId, this.customer, [
           db`SELECT order_id, total_minor, currency
              FROM orders WHERE idempotency_key = ${idempotencyKey}`,
         ]);
@@ -342,6 +345,11 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     const settings = getSettings(this.env);
     const db = createDb(settings);
     const query_data = queryDataTool({ db, shopId: this.shopId });
+    const past_orders = pastOrdersTool({
+      db,
+      shopId: this.shopId,
+      customerId: this.customer,
+    });
     const add_item = addItemTool({
       addItem: (product_id, qty) => this.addItem(product_id, qty),
     });
@@ -390,6 +398,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       output,
       tools: {
         query_data,
+        past_orders,
         add_item,
         remove_item,
         set_fulfillment,
