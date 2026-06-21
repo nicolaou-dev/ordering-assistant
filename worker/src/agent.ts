@@ -55,14 +55,39 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       id INTEGER PRIMARY KEY,
       role TEXT NOT NULL,
       content TEXT NOT NULL,
+      draft_id TEXT,
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`;
   }
 
+  /**
+   * The current session's draft_id, generating and persisting one when a new
+   * session starts (no active draft). Stable through the draft's life and cleared
+   * at submit, so it also seeds the submit idempotency key. Assigned here, at the
+   * session's first message, rather than at first add_item — so pre-item browsing
+   * turns belong to the same session and load together.
+   */
+  private ensureDraftId(): string {
+    if (this.state.draftId) return this.state.draftId;
+    const draftId = crypto.randomUUID();
+    this.setState({ ...this.state, draftId });
+    return draftId;
+  }
+
+  /**
+   * Record an inbound user message under the current session's draft_id, so the
+   * model turn loads only this session's history — a conversation that resumes
+   * after a placed order starts clean.
+   */
+  private recordUserMessage(content: string): void {
+    const draftId = this.ensureDraftId();
+    this
+      .sql`INSERT INTO messages (role, content, draft_id) VALUES ('user', ${JSON.stringify(content)}, ${draftId})`;
+  }
+
   @callable()
   async runTurn(prompt: string): Promise<Reply[]> {
-    this
-      .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify(prompt)})`;
+    this.recordUserMessage(prompt);
     return this.runModel();
   }
 
@@ -76,8 +101,9 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
    */
   @callable()
   async checkout(): Promise<Reply[]> {
-    this
-      .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify("[The customer tapped Checkout in the storefront — they've finished adding items, so don't ask if they'd like anything else. Carry on with the order from here.]")})`;
+    this.recordUserMessage(
+      "[The customer tapped Checkout in the storefront — they've finished adding items, so don't ask if they'd like anything else. Carry on with the order from here.]",
+    );
     return this.runModel();
   }
 
@@ -91,8 +117,9 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
    */
   @callable()
   async notifyApproved(): Promise<Reply[]> {
-    this
-      .sql`INSERT INTO messages (role, content) VALUES ('user', ${JSON.stringify("[The shop approved the customer's order. Let them know it's confirmed and being prepared.]")})`;
+    this.recordUserMessage(
+      "[The shop approved the customer's order. Let them know it's confirmed and being prepared.]",
+    );
     return this.runModel();
   }
 
@@ -141,7 +168,8 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       return {
         error: `Unknown product_id "${product_id}". Find the right one with query_data.`,
       };
-    if (!product.in_stock) return { error: `"${product.name}" is out of stock.` };
+    if (!product.in_stock)
+      return { error: `"${product.name}" is out of stock.` };
 
     const next = addItemToOrder(
       this.state,
@@ -153,13 +181,8 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       },
       qty,
     );
-    // Seed the idempotency key the moment the draft becomes non-empty, so it's
-    // stable for every later submit_order retry of this same draft.
-    const seeded = next.draftId
-      ? next
-      : { ...next, draftId: crypto.randomUUID() };
-    this.setState(seeded);
-    return seeded;
+    this.setState(next);
+    return next;
   }
 
   /**
@@ -186,7 +209,11 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
    */
   setAddress(fields: Partial<Address>): Address | { error: string } {
     const trimmed = (v: string | undefined) => v?.trim() || undefined;
-    const required = { line1: "street address", city: "city", postcode: "postcode" } as const;
+    const required = {
+      line1: "street address",
+      city: "city",
+      postcode: "postcode",
+    } as const;
     const missing = Object.entries(required)
       .filter(([k]) => !trimmed(fields[k as keyof Address]))
       .map(([, label]) => label);
@@ -220,11 +247,14 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
    * order via the idempotency_key UNIQUE.
    */
   async submitOrder(): Promise<
-    { order_id: string; total_minor: number; currency: string } | { error: string }
+    | { order_id: string; total_minor: number; currency: string }
+    | { error: string }
   > {
     const state = this.state;
     if (state.items.length === 0)
-      return { error: "The order is empty — add at least one item before submitting." };
+      return {
+        error: "The order is empty — add at least one item before submitting.",
+      };
     if (!state.fulfillment.type)
       return {
         error:
@@ -323,10 +353,15 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       // the order already exists, so return it instead of erroring or writing
       // twice.
       if ((e as { code?: string }).code === "23505") {
-        const [existing] = await withShopCustomer(db, this.shopId, this.customer, [
-          db`SELECT order_id, total_minor, currency
+        const [existing] = await withShopCustomer(
+          db,
+          this.shopId,
+          this.customer,
+          [
+            db`SELECT order_id, total_minor, currency
              FROM orders WHERE idempotency_key = ${idempotencyKey}`,
-        ]);
+          ],
+        );
         const row = existing[0] as
           | { order_id: string; total_minor: number; currency: string }
           | undefined;
@@ -407,10 +442,15 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       "claude-haiku-4-5",
     );
 
+    // The session's draft_id, set by the entry point before this runs. Captured
+    // once: submit_order may clear it mid-turn, but the user message and this
+    // turn's replies all belong to the same session, so they share this id and
+    // the next turn (a fresh draft_id) starts with a clean window.
+    const draftId = this.state.draftId;
     const rows = this.sql<{
       role: string;
       content: string;
-    }>`SELECT role, content FROM messages ORDER BY id`;
+    }>`SELECT role, content FROM messages WHERE draft_id = ${draftId} ORDER BY id`;
 
     const messages = rows.map((r) => ({
       role: r.role,
@@ -440,7 +480,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
 
     for (const message of response.messages) {
       this
-        .sql`INSERT INTO messages (role, content) VALUES (${message.role}, ${JSON.stringify(message.content)})`;
+        .sql`INSERT INTO messages (role, content, draft_id) VALUES (${message.role}, ${JSON.stringify(message.content)}, ${draftId})`;
     }
 
     return replies;
