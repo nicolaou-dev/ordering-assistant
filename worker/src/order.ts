@@ -36,6 +36,10 @@ export type OrderState = {
   // tickets read the total without re-summing.
   total_minor: number;
   fulfillment: Fulfillment;
+  // An order-level special instruction the customer gave (e.g. "no nuts",
+  // "leave at the door"). null until set_note records one; the customer is the
+  // source of truth for it, like the address — the model writes what they typed.
+  note: string | null;
   // Idempotency seed for submit_order: assigned when the draft gets its first
   // item, cleared when the order is placed. Combined with the DO name it forms
   // a key stable across retries of the same draft, so a double submit collapses
@@ -47,6 +51,7 @@ export const emptyOrder: OrderState = {
   items: [],
   total_minor: 0,
   fulfillment: { type: null, address: null },
+  note: null,
   draftId: null,
 };
 
@@ -74,6 +79,16 @@ export function setFulfillment(
  */
 export function setAddress(state: OrderState, address: Address): OrderState {
   return { ...state, fulfillment: { ...state.fulfillment, address } };
+}
+
+/**
+ * Set or clear the order-level note, returning the next state. A blank note
+ * (empty or whitespace) clears it back to null. Pure: the customer is the source
+ * of truth for their own note; the caller (set_note tool) records what they
+ * typed, never invents content.
+ */
+export function setNote(state: OrderState, note: string): OrderState {
+  return { ...state, note: note.trim() || null };
 }
 
 /**
@@ -140,6 +155,10 @@ export function renderOrderSnapshot(state: OrderState): string {
   // Delivery needs an address; pickup shows no address line at all.
   if (type === "delivery") {
     header += `\nAddress: ${address ? formatAddress(address) : "needed"}`;
+  }
+  // Order-level note, shown only when set (mirrors the address line).
+  if (state.note) {
+    header += `\nNote: ${state.note}`;
   }
   if (state.items.length === 0) {
     return `${header}\n\n(empty — no items added yet)`;

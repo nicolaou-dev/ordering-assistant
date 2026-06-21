@@ -23,6 +23,7 @@ import {
   removeItemTool,
   setFulfillmentTool,
   setAddressTool,
+  setNoteTool,
   submitOrderTool,
 } from "./tools";
 
@@ -341,12 +342,12 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
         db`INSERT INTO orders (
              order_id, shop_id, customer_phone, fulfillment_type,
              address_line1, address_line2, address_city, address_postcode, address_notes,
-             currency, total_minor
+             note, currency, total_minor
            ) VALUES (
              ${orderId}, ${this.shopId}, ${this.customer}, ${state.fulfillment.type},
              ${addr?.line1 ?? null}, ${addr?.line2 ?? null}, ${addr?.city ?? null},
              ${addr?.postcode ?? null}, ${addr?.notes ?? null},
-             ${currency}, ${total}
+             ${state.note}, ${currency}, ${total}
            )`,
         ...items.map(
           (i) =>
@@ -407,6 +408,10 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     });
     const set_address = setAddressTool({
       setAddress: (fields) => this.setAddress(fields),
+    });
+    const set_note = setNoteTool({
+      getState: () => this.state,
+      setState: (state) => this.setState(state),
     });
     const submit_order = submitOrderTool({
       submitOrder: () => this.submitOrder(),
@@ -490,6 +495,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
         remove_item,
         set_fulfillment,
         set_address,
+        set_note,
         submit_order,
       },
       stopWhen: stepCountIs(5),
