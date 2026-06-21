@@ -350,27 +350,30 @@ app.get("/debug/seller", async (c) => {
 
 // Seller reads their shop's orders, newest first — the read side the approve
 // flow acts on, until a dashboard exists. The Bearer token is the identity
-// (verifySellerToken -> shop_id), and withShop scopes both reads under RLS, so a
-// shop only ever sees its own orders. Optional ?status= narrows to one status
-// (e.g. the pending_approval queue); absent, all statuses are returned. Items
-// are the stored snapshot (never re-priced from the catalog); order_items'
-// policy scopes them through their parent order, so the unfiltered item read
-// already returns only this shop's lines, which we group onto their orders.
+// (verifySellerToken -> shop_id). This is the seller path — deterministic SQL we
+// own — so it connects as the admin role and scopes every query with an explicit
+// shop_id filter, the same pattern as catalog ingest. (RLS on orders is reserved
+// for the customer agent path, which is locked to a single customer.) Optional
+// ?status= narrows to one status (e.g. the pending_approval queue); absent, all
+// statuses are returned. Items are the stored snapshot (never re-priced); they
+// carry no shop_id of their own, so they're scoped through their parent orders.
 app.get("/orders", async (c) => {
   const shopId = await sellerShopId(c);
   const status = c.req.query("status");
-  const sql = createDb(getSettings(c.env));
+  const sql = createAdminDb(getSettings(c.env));
 
-  const [orders, items] = await withShop(sql, shopId, [
+  const [orders, items] = await sql.transaction([
     status
       ? sql`SELECT order_id, status, customer_phone, fulfillment_type,
                    total_minor, currency, created_at
-            FROM orders WHERE status = ${status} ORDER BY created_at DESC`
+            FROM orders WHERE shop_id = ${shopId} AND status = ${status}
+            ORDER BY created_at DESC`
       : sql`SELECT order_id, status, customer_phone, fulfillment_type,
                    total_minor, currency, created_at
-            FROM orders ORDER BY created_at DESC`,
+            FROM orders WHERE shop_id = ${shopId} ORDER BY created_at DESC`,
     sql`SELECT order_id, qty, name, unit_price_minor, line_total_minor
-        FROM order_items`,
+        FROM order_items
+        WHERE order_id IN (SELECT order_id FROM orders WHERE shop_id = ${shopId})`,
   ]);
 
   const itemsByOrder = new Map<string, Record<string, any>[]>();
@@ -385,22 +388,24 @@ app.get("/orders", async (c) => {
 });
 
 // Seller approves one pending order. The Bearer token is the identity: it
-// resolves to the shop_id (never the path), and withShop scopes the write under
-// RLS so a token for shop A can't touch shop B's order — that order is simply
-// invisible, so it reads as 404. The UPDATE is guarded on status so only
-// pending_approval -> approved happens; any other status is left untouched and
-// reported back (409) so the seller knows it was already handled.
+// resolves to the shop_id (never the path). The seller path runs as the admin
+// role with an explicit shop_id filter on every query, so a token for shop A
+// can't touch shop B's order — no row matches, the status read comes back empty,
+// and it reads as 404. The UPDATE is guarded on status so only pending_approval
+// -> approved happens; any other status is left untouched and reported back
+// (409) so the seller knows it was already handled.
 app.post("/orders/:order_id/approve", async (c) => {
   const settings = getSettings(c.env);
   const shopId = await sellerShopId(c);
   const orderId = c.req.param("order_id");
-  const sql = createDb(settings);
+  const sql = createAdminDb(settings);
 
-  const [approved, current] = await withShop(sql, shopId, [
+  const [approved, current] = await sql.transaction([
     sql`UPDATE orders SET status = 'approved', updated_at = now()
-        WHERE order_id = ${orderId} AND status = 'pending_approval'
+        WHERE order_id = ${orderId} AND shop_id = ${shopId}
+          AND status = 'pending_approval'
         RETURNING order_id, status, customer_phone`,
-    sql`SELECT status FROM orders WHERE order_id = ${orderId}`,
+    sql`SELECT status FROM orders WHERE order_id = ${orderId} AND shop_id = ${shopId}`,
   ]);
 
   if (approved.length > 0) {
@@ -415,7 +420,9 @@ app.post("/orders/:order_id/approve", async (c) => {
     await sendReplies(replies, {
       client: createClient(settings),
       to: customer,
-      sql,
+      // loop_agent (RLS): sendReplies hydrates product_list cards from the
+      // catalog scoped to this shop. Only the order UPDATE/read above needs admin.
+      sql: createDb(settings),
       shopId,
       menuLink: async () =>
         `${settings.STOREFRONT_URL}/?t=${await mintCartToken(shopId, customer, settings.WHATSAPP_APP_SECRET)}`,
