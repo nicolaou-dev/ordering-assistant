@@ -109,7 +109,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   @callable()
   async checkout(): Promise<Reply[]> {
     this.recordUserMessage(
-      "[The customer tapped Checkout in the storefront — they've finished adding items, so don't ask if they'd like anything else. Carry on with the order from here.]",
+      "[The customer tapped Checkout in the storefront. Their items are in the current order below (## Current order) — read it as the order so far. They've finished adding, so take it from there toward placing the order.]",
     );
     return this.runModel();
   }
@@ -489,8 +489,17 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     // ORDER BY id keeps the prev-order chat ahead of the current draft's. Once
     // the order is terminal, prevId is null — and IN (NULL, draftId) matches the
     // same rows as = draftId, so the window cleanly narrows to the current draft.
+    //
+    // Only carry it while the new draft is empty (no items): the placed order's
+    // chat is context for follow-ups *between* orders, but once the customer
+    // starts a new order it just confuses the model — it anchors on the old
+    // "your order's placed" turns and ignores the live snapshot (at storefront
+    // checkout it stalls or claims the old order is done). renderLastOrder still
+    // shows the prev order's status, so follow-ups don't lose it.
     const prevId =
-      lastOrder && !TERMINAL_STATUSES.has(lastOrder.status)
+      lastOrder &&
+      !TERMINAL_STATUSES.has(lastOrder.status) &&
+      this.state.items.length === 0
         ? lastOrder.order_id
         : null;
     const rows = this.sql<{ role: string; content: string }>`
