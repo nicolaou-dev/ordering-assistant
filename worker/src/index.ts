@@ -171,7 +171,11 @@ app.post("/webhook/whatsapp", async (c) => {
 
     const client = createClient(settings);
 
-    client.markReadTyping(id).catch((e) => {
+    // Await so the read receipt + typing indicator are actually sent before the
+    // slow agent turn — and not cancelled when a fast turn lets handleInbound
+    // (and its waitUntil) settle before a detached fetch finishes. Catch so a
+    // markReadTyping failure logs but never blocks the reply.
+    await client.markReadTyping(id).catch((e) => {
       console.error("markReadTyping failed", {
         id,
         error: (e as Error).message,
