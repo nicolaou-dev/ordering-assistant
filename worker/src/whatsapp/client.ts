@@ -1,4 +1,5 @@
 import { Settings } from "../settings";
+import { toWhatsApp } from "./markdown";
 
 export const createClient = (settings: Settings) => {
   return {
@@ -15,7 +16,7 @@ export const createClient = (settings: Settings) => {
           recipient_type: "individual",
           to,
           type: "text",
-          text: { body },
+          text: { body: toWhatsApp(body) },
         }),
       });
 
@@ -37,7 +38,7 @@ export const createClient = (settings: Settings) => {
           recipient_type: "individual",
           to,
           type: "image",
-          image: { link: imageUrl, caption },
+          image: { link: imageUrl, caption: toWhatsApp(caption) },
         }),
       });
 
@@ -72,7 +73,7 @@ export const createClient = (settings: Settings) => {
           type: "interactive",
           interactive: {
             type: "cta_url",
-            body: { text: body },
+            body: { text: toWhatsApp(body) },
             action: {
               name: "cta_url",
               parameters: { display_text: buttonText, url },
