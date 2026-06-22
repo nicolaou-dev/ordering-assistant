@@ -16,7 +16,11 @@ export function submitOrderTool({
     inputSchema: z.object({}),
     execute: async () => {
       const result = await submitOrder();
-      if (!("error" in result)) return result;
+      if (!("error" in result))
+        return {
+          ...result,
+          next: "Tell the customer their order's been sent to the shop and is waiting to be approved — that usually takes a couple of minutes — and you'll let them know the moment it's confirmed.",
+        };
       // The error names what's missing or stale — e.g. fulfillment not recorded
       // (call set_fulfillment), no delivery address (set_address), or a price/stock
       // change. Fix that cause and retry here, in this same turn, rather than
