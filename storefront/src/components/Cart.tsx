@@ -60,11 +60,11 @@ export default function Cart({
             className="fixed inset-0 z-30 bg-black/30"
             onClick={() => setOpen(false)}
           />
-          <div className="fixed inset-0 z-40 flex flex-col rounded-t-2xl bg-white">
+          <div className="fixed inset-0 z-40 flex flex-col rounded-t-2xl bg-neutral-900 text-neutral-50">
             <button
               onClick={() => setOpen(false)}
               aria-label="Close cart"
-              className="absolute right-4 top-4 text-neutral-500"
+              className="absolute right-4 top-4 text-neutral-400"
             >
               <X size={24} />
             </button>
@@ -91,7 +91,7 @@ export default function Cart({
           <button
             onClick={onCheckout}
             disabled={checkingOut}
-            className="flex w-full items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-white shadow-lg disabled:opacity-60"
+            className="flex w-full items-center gap-2 rounded-xl bg-brand px-4 py-3.5 text-white shadow-lg disabled:opacity-60"
           >
             <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-white/25 px-1.5 text-sm font-bold">
               {count}
@@ -107,7 +107,7 @@ export default function Cart({
           <button
             onClick={() => setOpen(true)}
             aria-label={`View order, ${count} item${count === 1 ? "" : "s"}`}
-            className="flex w-full items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-white shadow-lg"
+            className="flex w-full items-center gap-2 rounded-xl bg-brand px-4 py-3.5 text-white shadow-lg"
           >
             <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-white/25 px-1.5 text-sm font-bold">
               {count}
@@ -144,10 +144,10 @@ function CartLine({
           aria-label={
             item.qty === 1 ? `Remove ${item.name}` : `Decrease ${item.name}`
           }
-          className={`flex h-8 w-8 items-center justify-center rounded-full border disabled:opacity-40 ${
+          className={`flex h-8 w-8 items-center justify-center rounded-full disabled:opacity-40 ${
             item.qty === 1
-              ? "border-red-200 text-red-600"
-              : "border-neutral-300"
+              ? "bg-red-500/15 text-red-400"
+              : "bg-white/10 text-neutral-200"
           }`}
         >
           {item.qty === 1 ? <Trash2 size={15} /> : <Minus size={15} />}
@@ -159,14 +159,14 @@ function CartLine({
           onClick={() => mutate(workerUrl, item.product_id, "add")}
           disabled={busy}
           aria-label={`Add one ${item.name}`}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-white disabled:opacity-40"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-white disabled:opacity-40"
         >
           <Plus size={15} />
         </button>
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{item.name}</div>
-        <div className="text-xs text-neutral-500">
+        <div className="text-xs text-neutral-400">
           {money(item.unit_price_minor * item.qty, item.currency)}
         </div>
       </div>

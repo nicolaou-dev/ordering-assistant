@@ -1,1 +1,8 @@
 @import "tailwindcss";
+
+@theme {
+  /* Single brand accent for CTAs (add buttons, cart bar). Swap this one value
+     to recolour the storefront — near-black reads clean/premium; a warm accent
+     (e.g. #ff5a1f) gives more of a food-app pop. */
+  --color-brand: #0070d8;
+}

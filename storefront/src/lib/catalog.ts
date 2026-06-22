@@ -43,5 +43,25 @@ export async function loadCatalog(): Promise<Category[]> {
     group.push(p);
     byCategory.set(p.category, group);
   }
-  return [...byCategory].map(([name, products]) => ({ name, products }));
+  // Placeholder menu ordering until it's shop-configurable (backend-driven, its
+  // own ticket): a curated priority with unknown categories falling to the end
+  // alphabetically. Mains/savoury first, drinks and desserts last.
+  const ORDER = [
+    "Pies",
+    "Vegan Pies",
+    "Pizza",
+    "Vegan Pizza",
+    "Falafel",
+    "Koupes",
+    "Appetizers",
+    "Desserts",
+    "Drinks",
+  ];
+  const rank = (name: string) => {
+    const i = ORDER.findIndex((c) => c.toLowerCase() === name.toLowerCase());
+    return i === -1 ? ORDER.length : i;
+  };
+  return [...byCategory]
+    .map(([name, products]) => ({ name, products }))
+    .sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name));
 }
