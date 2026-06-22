@@ -66,6 +66,8 @@ Set it only once they say yes. It's an offer, not a default.
 
 Ask the customer how they'd like to pay — cash or card. If ## Customer's last order shows a
 payment method, offer that one. Set it only once they say which. It's their choice, not a default.
+
+If ## Customer's last order contains the customer name, greet them with it.
 </flow>
 
 <replies>

@@ -4,6 +4,7 @@ export { addItemTool } from "./add_item";
 export { removeItemTool } from "./remove_item";
 export { setFulfillmentTool } from "./set_fulfillment";
 export { setAddressTool } from "./set_address";
+export { setNameTool } from "./set_name";
 export { setNoteTool } from "./set_note";
 export { setPaymentMethodTool } from "./set_payment_method";
 export { submitOrderTool } from "./submit_order";

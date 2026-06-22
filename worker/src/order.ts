@@ -44,6 +44,11 @@ export type OrderState = {
   // cash completes with no payment step, card is paid via a link (separate
   // ticket). A required field, like fulfillment — submit_order guards on it.
   payment_method: "cash" | "card" | null;
+  // Who the order is for — the customer's name, for greeting and addressing them.
+  // Seeded each session from their last order (set_name overrides) and persisted
+  // onto the placed order, so a returning customer isn't asked again. null until
+  // known, rendered as a prompt to ask.
+  customerName: string | null;
   // Idempotency seed for submit_order: assigned when the draft gets its first
   // item, cleared when the order is placed. Combined with the DO name it forms
   // a key stable across retries of the same draft, so a double submit collapses
@@ -57,6 +62,7 @@ export const emptyOrder: OrderState = {
   fulfillment: { type: null, address: null },
   note: null,
   payment_method: null,
+  customerName: null,
   draftId: null,
 };
 
@@ -106,6 +112,15 @@ export function setPaymentMethod(
   method: "cash" | "card",
 ): OrderState {
   return { ...state, payment_method: method };
+}
+
+/**
+ * Set or clear the customer's name, returning the next state. A blank name
+ * clears it back to null. Pure: the customer is the source of truth for their
+ * own name; the caller (set_name tool) records what they gave, never invents it.
+ */
+export function setName(state: OrderState, name: string): OrderState {
+  return { ...state, customerName: name.trim() || null };
 }
 
 /**
@@ -168,7 +183,10 @@ export function removeItem(
 export function renderOrderSnapshot(state: OrderState): string {
   const { type, address } = state.fulfillment;
   const fulfillment = type ?? "not set yet. Set using set_fulfillment";
-  let header = `## Current order\n\nStatus: draft\nFulfillment: ${fulfillment}`;
+  const customer =
+    state.customerName ??
+    "ask the customer who the order is for, then set using set_name";
+  let header = `## Current order\n\nStatus: draft\nOrder for: ${customer}\nFulfillment: ${fulfillment}`;
   // Delivery needs an address; pickup shows no address line at all.
   if (type === "delivery") {
     header += `\nAddress: ${address ? formatAddress(address) : "needed"}`;
@@ -205,6 +223,10 @@ export type RecentOrder = {
   created_at: string | Date;
   status: string;
   fulfillment_type: "pickup" | "delivery";
+  // The name on the last order, used to greet a returning customer without
+  // asking again. null for orders placed before name capture, or when no name
+  // was ever given.
+  customer_name: string | null;
   // How they paid last time, for the agent to offer the same again. null for
   // orders placed before payment capture existed. Like the address, it's an
   // offer, not a default — set_payment_method writes the draft only on the
