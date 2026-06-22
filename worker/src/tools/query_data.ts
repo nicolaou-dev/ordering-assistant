@@ -10,7 +10,7 @@ export const ROW_CAP = 50;
 export function queryDataTool({ db, shopId }: { db: Sql; shopId: string }) {
   return tool({
     description: `
-    Use this tool to search for products the customer specifically mentioned. Or close alternatives.
+    Use this tool to search for products the customer specifically mentioned or close alternatives. If you can't find any send the menu reply instead.
 
     Run one read-only SQL SELECT over this shop's catalog and read the rows back. Use it before you mention any product, price, or availability.
 

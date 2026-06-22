@@ -436,7 +436,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
                           'city', o.address_city, 'postcode', o.address_postcode,
                           'notes', o.address_notes)
                    ELSE NULL END AS address,
-                 jsonb_agg(jsonb_build_object('name', i.name, 'qty', i.qty)
+                 jsonb_agg(jsonb_build_object('product_id', i.product_id, 'name', i.name, 'qty', i.qty)
                            ORDER BY i.name) AS items
            FROM orders o
            JOIN order_items i ON i.order_id = o.order_id

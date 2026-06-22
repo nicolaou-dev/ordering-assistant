@@ -166,7 +166,7 @@ export function renderOrderSnapshot(state: OrderState): string {
   const currency = state.items[0].currency;
   const lines = state.items.map((i) => {
     const lineTotal = i.unit_price_minor * i.qty;
-    return `- ${i.qty} x ${i.name} @ ${i.unit_price_minor} = ${lineTotal}`;
+    return `- ${i.qty} x ${i.name} (id: ${i.product_id}) @ ${i.unit_price_minor} = ${lineTotal}`;
   });
   return `${header}\nCurrency: ${currency} (all amounts below are price_minor — minor units, e.g. 850 = 8.50)\n\n${lines.join("\n")}\n\nOrder total: ${state.total_minor}`;
 }
@@ -187,7 +187,7 @@ export type RecentOrder = {
   // pre-filling the draft; set_address still writes OrderState.address only on
   // the customer's explicit confirmation.
   address: Address | null;
-  items: { name: string; qty: number }[];
+  items: { product_id: string; name: string; qty: number }[];
 };
 
 // How long ago, in words a customer would use. Whole-day granularity (UTC) is
@@ -205,14 +205,17 @@ function relativeDay(then: Date): string {
  * returning customer is greeted with awareness and the agent can speak to an
  * in-flight order (its status) without a tool call, and offer the same
  * fulfillment again. Deliberately lean: no prices (they go stale and the model
- * must never quote an old one as current) — just what they got, when, where it
- * stands, pickup/delivery, and the delivery address to offer back. Reordering or
- * quoting prices goes through the tools, which re-read the live catalog. Returns
- * "" for a first-timer (no block).
+ * must never quote an old one as current) — just what they got (with the stable
+ * product_id, so a reorder adds the exact item), when, where it stands,
+ * pickup/delivery, and the delivery address to offer back. Reordering or quoting
+ * prices goes through the tools, which re-read the live catalog. Returns "" for a
+ * first-timer (no block).
  */
 export function renderLastOrder(order: RecentOrder | null): string {
   if (!order) return "";
-  const lines = order.items.map((i) => `- ${i.qty} x ${i.name}`).join("\n");
+  const lines = order.items
+    .map((i) => `- ${i.qty} x ${i.name} (id: ${i.product_id})`)
+    .join("\n");
   const when = new Date(order.created_at);
   const placed = `${when.toISOString().slice(0, 10)} (${relativeDay(when)})`;
   const address =
