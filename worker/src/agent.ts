@@ -24,6 +24,7 @@ import {
   setFulfillmentTool,
   setAddressTool,
   setNoteTool,
+  setPaymentMethodTool,
   submitOrderTool,
 } from "./tools";
 
@@ -270,6 +271,11 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
         error:
           "This is a delivery but there's no address yet — collect it with set_address first.",
       };
+    if (!state.payment_method)
+      return {
+        error:
+          "Payment method isn't set — confirm cash or card with set_payment_method first.",
+      };
 
     const db = createDb(getSettings(this.env));
 
@@ -342,12 +348,12 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
         db`INSERT INTO orders (
              order_id, shop_id, customer_phone, fulfillment_type,
              address_line1, address_line2, address_city, address_postcode, address_notes,
-             note, currency, total_minor
+             note, payment_method, currency, total_minor
            ) VALUES (
              ${orderId}, ${this.shopId}, ${this.customer}, ${state.fulfillment.type},
              ${addr?.line1 ?? null}, ${addr?.line2 ?? null}, ${addr?.city ?? null},
              ${addr?.postcode ?? null}, ${addr?.notes ?? null},
-             ${state.note}, ${currency}, ${total}
+             ${state.note}, ${state.payment_method}, ${currency}, ${total}
            )`,
         ...items.map(
           (i) =>
@@ -413,6 +419,10 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       getState: () => this.state,
       setState: (state) => this.setState(state),
     });
+    const set_payment_method = setPaymentMethodTool({
+      getState: () => this.state,
+      setState: (state) => this.setState(state),
+    });
     const submit_order = submitOrderTool({
       submitOrder: () => this.submitOrder(),
     });
@@ -429,7 +439,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
         db`SELECT name FROM shops`,
         db`SELECT category, count(*)::int AS count
            FROM products WHERE deleted_at IS NULL GROUP BY category`,
-        db`SELECT o.order_id, o.created_at, o.status, o.fulfillment_type,
+        db`SELECT o.order_id, o.created_at, o.status, o.fulfillment_type, o.payment_method,
                  CASE WHEN o.fulfillment_type = 'delivery' AND o.address_line1 IS NOT NULL
                    THEN jsonb_build_object(
                           'line1', o.address_line1, 'line2', o.address_line2,
@@ -441,7 +451,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
            FROM orders o
            JOIN order_items i ON i.order_id = o.order_id
            GROUP BY o.order_id, o.created_at, o.status, o.fulfillment_type,
-                    o.address_line1, o.address_line2, o.address_city,
+                    o.payment_method, o.address_line1, o.address_line2, o.address_city,
                     o.address_postcode, o.address_notes
            ORDER BY o.created_at DESC
            LIMIT 1`,
@@ -496,6 +506,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
         set_fulfillment,
         set_address,
         set_note,
+        set_payment_method,
         submit_order,
       },
       stopWhen: stepCountIs(5),

@@ -63,6 +63,9 @@ and get them to confirm it's correct.
 
 Ask the customer if they would like to use the same fulfillment from ## Customer's last order if it's available.
 Set it only once they say yes. It's an offer, not a default.
+
+Ask the customer how they'd like to pay — cash or card. If ## Customer's last order shows a
+payment method, offer that one. Set it only once they say which. It's their choice, not a default.
 </flow>
 
 <replies>

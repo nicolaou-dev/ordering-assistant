@@ -40,6 +40,10 @@ export type OrderState = {
   // "leave at the door"). null until set_note records one; the customer is the
   // source of truth for it, like the address — the model writes what they typed.
   note: string | null;
+  // How the customer pays. null until set_payment_method records the choice;
+  // cash completes with no payment step, card is paid via a link (separate
+  // ticket). A required field, like fulfillment — submit_order guards on it.
+  payment_method: "cash" | "card" | null;
   // Idempotency seed for submit_order: assigned when the draft gets its first
   // item, cleared when the order is placed. Combined with the DO name it forms
   // a key stable across retries of the same draft, so a double submit collapses
@@ -52,6 +56,7 @@ export const emptyOrder: OrderState = {
   total_minor: 0,
   fulfillment: { type: null, address: null },
   note: null,
+  payment_method: null,
   draftId: null,
 };
 
@@ -89,6 +94,18 @@ export function setAddress(state: OrderState, address: Address): OrderState {
  */
 export function setNote(state: OrderState, note: string): OrderState {
   return { ...state, note: note.trim() || null };
+}
+
+/**
+ * Set how the customer pays, returning the next state. Switching just overwrites
+ * the previous choice. Pure: the model records the customer's answer; the card
+ * payment link (separate ticket) is generated elsewhere.
+ */
+export function setPaymentMethod(
+  state: OrderState,
+  method: "cash" | "card",
+): OrderState {
+  return { ...state, payment_method: method };
 }
 
 /**
@@ -156,6 +173,12 @@ export function renderOrderSnapshot(state: OrderState): string {
   if (type === "delivery") {
     header += `\nAddress: ${address ? formatAddress(address) : "needed"}`;
   }
+  // Payment method — a required field, so always shown with a prompt when unset
+  // (mirrors the Fulfillment line).
+  const payment =
+    state.payment_method ??
+    "not chosen yet — ask the customer whether they'll pay cash or card, then record their answer using set_payment_method";
+  header += `\nPayment: ${payment}`;
   // Order-level note, shown only when set (mirrors the address line).
   if (state.note) {
     header += `\nNote: ${state.note}`;
@@ -182,6 +205,11 @@ export type RecentOrder = {
   created_at: string | Date;
   status: string;
   fulfillment_type: "pickup" | "delivery";
+  // How they paid last time, for the agent to offer the same again. null for
+  // orders placed before payment capture existed. Like the address, it's an
+  // offer, not a default — set_payment_method writes the draft only on the
+  // customer's say-so.
+  payment_method: "cash" | "card" | null;
   // The delivery address used last time, for the agent to offer again. null for
   // pickup orders (nothing to reuse). Read-only context — offering it is not
   // pre-filling the draft; set_address still writes OrderState.address only on
@@ -222,5 +250,8 @@ export function renderLastOrder(order: RecentOrder | null): string {
     order.fulfillment_type === "delivery" && order.address
       ? `\nDelivered to: ${formatAddress(order.address)}`
       : "";
-  return `## Customer's last order\n\nPlaced: ${placed}\nStatus: ${order.status.replace(/_/g, " ")}\nFulfillment: ${order.fulfillment_type}${address}\n\n${lines}`;
+  const payment = order.payment_method
+    ? `\nPayment: ${order.payment_method}`
+    : "";
+  return `## Customer's last order\n\nPlaced: ${placed}\nStatus: ${order.status.replace(/_/g, " ")}\nFulfillment: ${order.fulfillment_type}${address}${payment}\n\n${lines}`;
 }
