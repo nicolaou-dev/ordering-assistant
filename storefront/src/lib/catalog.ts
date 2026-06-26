@@ -18,15 +18,39 @@ export type Product = {
 
 export type Category = { name: string; products: Product[] };
 
-export async function loadCatalog(): Promise<Category[]> {
-  // import.meta.env (not process.env) — Astro exposes these to server-side code
-  // in both `astro dev` and `astro build`; process.env is only populated at build.
+// The shop's storefront header, read from the shops row at build time. A shop
+// created by catalog ingest has cover_url/tagline null; the page omits them.
+export type Shop = { name: string; cover_url: string | null; tagline: string | null };
+
+// import.meta.env (not process.env) — Astro exposes these to server-side code in
+// both `astro dev` and `astro build`; process.env is only populated at build.
+function buildEnv(): { url: string; shopId: string } {
   const url = import.meta.env.DATABASE_URL;
   const shopId = import.meta.env.SHOP_ID;
   if (!url || !shopId) {
     throw new Error("DATABASE_URL and SHOP_ID must be set to build the storefront");
   }
+  return { url, shopId };
+}
 
+// Read the shop's header (name, cover, tagline) scoped to one shop via the same
+// app.shop_id GUC + RLS the catalog read uses.
+export async function loadShop(): Promise<Shop> {
+  const { url, shopId } = buildEnv();
+  const sql = neon(url);
+  const [, rows] = (await sql.transaction([
+    sql`SELECT set_config('app.shop_id', ${shopId}, true)`,
+    sql`SELECT name, cover_url, tagline FROM shops WHERE phone_number_id = ${shopId}`,
+  ])) as [unknown, Shop[]];
+  const shop = rows[0];
+  if (!shop) {
+    throw new Error(`No shop found for SHOP_ID ${shopId}`);
+  }
+  return shop;
+}
+
+export async function loadCatalog(): Promise<Category[]> {
+  const { url, shopId } = buildEnv();
   const sql = neon(url);
   const [, products] = (await sql.transaction([
     sql`SELECT set_config('app.shop_id', ${shopId}, true)`,

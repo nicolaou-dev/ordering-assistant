@@ -5,7 +5,6 @@
 interface ImportMetaEnv {
   readonly DATABASE_URL: string;
   readonly SHOP_ID: string;
-  readonly SHOP_NAME: string;
   readonly WORKER_URL: string;
   readonly WA_NUMBER: string;
 }

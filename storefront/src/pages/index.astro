@@ -1,6 +1,6 @@
 ---
 import { Image, getImage } from "astro:assets";
-import { loadCatalog } from "../lib/catalog";
+import { loadCatalog, loadShop } from "../lib/catalog";
 import { money } from "../lib/money";
 import CartControl from "../components/CartControl.tsx";
 import Cart from "../components/Cart.tsx";
@@ -8,9 +8,12 @@ import TokenNotice from "../components/TokenNotice.tsx";
 import "../styles/global.css";
 
 const categories = await loadCatalog();
+const shop = await loadShop();
 const workerUrl = import.meta.env.WORKER_URL ?? "";
 const waNumber = import.meta.env.WA_NUMBER ?? "";
-const shopName = import.meta.env.SHOP_NAME ?? "Menu";
+const shopName = shop.name;
+const shopCover = shop.cover_url;
+const shopTagline = shop.tagline;
 
 // Anchor-id slug for each category, so the pills jump to their section.
 const slug = (s: string) =>
@@ -38,12 +41,14 @@ for (const cat of categories) {
 		<title>{shopName}</title>
 	</head>
 	<body class="bg-neutral-950 text-neutral-50">
-		<header class="relative isolate overflow-hidden">
-			<img
-				src="/cover.jpg"
-				alt={shopName}
-				class="h-56 w-full object-cover sm:h-72"
-			/>
+		<header class="relative isolate h-56 overflow-hidden bg-neutral-900 sm:h-72">
+			{shopCover && (
+				<img
+					src={shopCover}
+					alt={shopName}
+					class="h-full w-full object-cover"
+				/>
+			)}
 			{/* dark gradient so the overlaid name stays legible on any photo */}
 			<div
 				class="absolute inset-0 bg-linear-to-t from-neutral-950 via-neutral-950/40 to-transparent"
@@ -56,9 +61,11 @@ for (const cat of categories) {
 					>
 						{shopName}
 					</h1>
-					<p class="mt-1 text-sm font-medium text-white/90">
-						Fresh, made to order · Pickup & delivery
-					</p>
+					{shopTagline && (
+						<p class="mt-1 text-sm font-medium text-white/90">
+							{shopTagline}
+						</p>
+					)}
 				</div>
 			</div>
 		</header>

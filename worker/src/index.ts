@@ -309,6 +309,8 @@ app.post("/admin/catalog/:shop_id", async (c) => {
 const ShopBody = z.object({
   phone_number_id: z.string().trim().min(1),
   name: z.string().trim().min(1),
+  cover_url: z.string().trim().min(1).optional(),
+  tagline: z.string().trim().min(1).optional(),
 });
 
 app.post("/admin/shops", async (c) => {
@@ -323,12 +325,18 @@ app.post("/admin/shops", async (c) => {
     return c.json({ errors: parsed.error.issues }, 400);
   }
 
+  const { phone_number_id, name, cover_url, tagline } = parsed.data;
   const sql = createAdminDb(settings);
+  // COALESCE on conflict so a name-only update (e.g. just renaming) doesn't null
+  // out an existing cover_url/tagline.
   const [shop] = await sql`
-    INSERT INTO shops (phone_number_id, name)
-    VALUES (${parsed.data.phone_number_id}, ${parsed.data.name})
-    ON CONFLICT (phone_number_id) DO UPDATE SET name = excluded.name
-    RETURNING phone_number_id, name`;
+    INSERT INTO shops (phone_number_id, name, cover_url, tagline)
+    VALUES (${phone_number_id}, ${name}, ${cover_url ?? null}, ${tagline ?? null})
+    ON CONFLICT (phone_number_id) DO UPDATE SET
+      name = excluded.name,
+      cover_url = COALESCE(excluded.cover_url, shops.cover_url),
+      tagline = COALESCE(excluded.tagline, shops.tagline)
+    RETURNING phone_number_id, name, cover_url, tagline`;
   return c.json(shop);
 });
 
