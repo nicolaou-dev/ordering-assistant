@@ -12,7 +12,7 @@ import { createAdminDb, createDb, withShop, type Sql } from "./db";
 import type { Reply } from "./reply";
 import { getAgentByName } from "agents";
 import * as XLSX from "xlsx";
-import { mintSellerToken, verifySellerToken } from "./seller_token";
+import { verifyNeonAuthToken } from "./neon_auth";
 
 export { OrderAgent };
 
@@ -225,20 +225,28 @@ async function productId(shopId: string, category: string, name: string) {
     .join("");
 }
 
-// Authenticate a seller request by its Bearer token, returning the shop_id it
-// carries (the shop's phone_number_id). Throws 401 on a missing, invalid, or
-// expired token. The seller order endpoints derive shop_id from this — never
-// from the path or ADMIN_TOKEN.
+// Authenticate a seller request by its Neon Auth bearer token and resolve the
+// shop they own. Throws 401 on a missing/invalid token, 403 when the user owns
+// no shop. The seller order endpoints derive shop_id from this — never from the
+// path or ADMIN_TOKEN. (First slice assumes a single shop per owner.)
 async function sellerShopId(
   c: Context<{ Bindings: CloudflareBindings }>,
 ): Promise<string> {
   const settings = getSettings(c.env);
   const token = c.req.header("Authorization")?.slice(7);
-  const claims = token
-    ? await verifySellerToken(token, settings.WHATSAPP_APP_SECRET)
+  // Neon Auth signs tokens with iss = the deployment origin (no /neondb/auth
+  // path), so validate against the base URL's origin.
+  const issuer = new URL(settings.NEON_AUTH_BASE_URL).origin;
+  const userId = token
+    ? await verifyNeonAuthToken(token, settings.NEON_AUTH_JWKS_URL, issuer)
     : null;
-  if (!claims) throw new HTTPException(401, { message: "invalid seller token" });
-  return claims.phone_number_id;
+  if (!userId) throw new HTTPException(401, { message: "invalid auth token" });
+
+  const sql = createAdminDb(settings);
+  const [row] =
+    await sql`SELECT shop_id FROM shop_owners WHERE user_id = ${userId} LIMIT 1`;
+  if (!row) throw new HTTPException(403, { message: "no shop for this user" });
+  return row.shop_id as string;
 }
 
 app.post("/admin/catalog/:shop_id", async (c) => {
@@ -303,14 +311,19 @@ app.post("/admin/catalog/:shop_id", async (c) => {
   return c.json({ count: products.length });
 });
 
-// Create or rename a shop. Catalog ingest defaults shops.name to the shop_id;
-// this sets a real name. ON CONFLICT updates only the name, so re-running ingest
-// (which inserts shops ON CONFLICT DO NOTHING) never clobbers it.
+// Create or rename a shop, optionally assigning its owner. Catalog ingest
+// defaults shops.name to the shop_id; this sets a real name. ON CONFLICT updates
+// only name/cover/tagline, so re-running ingest (which inserts shops ON CONFLICT
+// DO NOTHING) never clobbers it. owner_user_id is a Neon Auth user.id; when
+// present it's recorded in shop_owners so that seller can work the shop's orders
+// — the admin bootstrap until self-serve onboarding sets the owner from the
+// signed-in user.
 const ShopBody = z.object({
   phone_number_id: z.string().trim().min(1),
   name: z.string().trim().min(1),
   cover_url: z.string().trim().min(1).optional(),
   tagline: z.string().trim().min(1).optional(),
+  owner_user_id: z.string().trim().min(1).optional(),
 });
 
 app.post("/admin/shops", async (c) => {
@@ -325,7 +338,7 @@ app.post("/admin/shops", async (c) => {
     return c.json({ errors: parsed.error.issues }, 400);
   }
 
-  const { phone_number_id, name, cover_url, tagline } = parsed.data;
+  const { phone_number_id, name, cover_url, tagline, owner_user_id } = parsed.data;
   const sql = createAdminDb(settings);
   // COALESCE on conflict so a name-only update (e.g. just renaming) doesn't null
   // out an existing cover_url/tagline.
@@ -337,38 +350,25 @@ app.post("/admin/shops", async (c) => {
       cover_url = COALESCE(excluded.cover_url, shops.cover_url),
       tagline = COALESCE(excluded.tagline, shops.tagline)
     RETURNING phone_number_id, name, cover_url, tagline`;
+  if (owner_user_id) {
+    await sql`INSERT INTO shop_owners (user_id, shop_id)
+              VALUES (${owner_user_id}, ${phone_number_id})
+              ON CONFLICT (user_id, shop_id) DO NOTHING`;
+  }
   return c.json(shop);
 });
 
-// Bootstrap minting so the seller order endpoints are testable before OTP login
-// exists. ADMIN_TOKEN-guarded; the shop_id (the shop's phone_number_id) is the
-// path param, and the minted token verifies back to it.
-app.post("/admin/shops/:shop_id/seller-token", async (c) => {
-  const settings = getSettings(c.env);
-  const token = c.req.header("Authorization")?.slice(7);
-  if (token !== settings.ADMIN_TOKEN) {
-    return c.body(null, 401);
-  }
-
-  const shopId = c.req.param("shop_id");
-  const sellerToken = await mintSellerToken(
-    shopId,
-    settings.WHATSAPP_APP_SECRET,
-  );
-  return c.json({ token: sellerToken });
-});
-
-// Exercise the seller Bearer auth: echoes back the shop_id a token resolves to,
-// or 401. Lets us manually verify a minted seller token before the real seller
-// endpoints (approve / list orders) exist.
+// Exercise the seller auth: echoes back the shop_id the caller's Neon Auth token
+// resolves to (via shop_owners), or 401/403. Lets us verify the auth path before
+// the dashboard exists.
 app.get("/debug/seller", async (c) => {
   const shopId = await sellerShopId(c);
   return c.json({ shop_id: shopId });
 });
 
 // Seller reads their shop's orders, newest first — the read side the approve
-// flow acts on, until a dashboard exists. The Bearer token is the identity
-// (verifySellerToken -> shop_id). This is the seller path — deterministic SQL we
+// flow acts on, until a dashboard exists. The caller's Neon Auth token resolves
+// to their shop (sellerShopId). This is the seller path — deterministic SQL we
 // own — so it connects as the admin role and scopes every query with an explicit
 // shop_id filter, the same pattern as catalog ingest. (RLS on orders is reserved
 // for the customer agent path, which is locked to a single customer.) Optional
