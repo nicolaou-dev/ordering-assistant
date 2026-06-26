@@ -23,11 +23,13 @@ const slug = (s: string) =>
 // image). Same width/height as the grid <Image>, so the transform is reused.
 const thumbs: Record<string, string> = {};
 for (const cat of categories) {
-  for (const p of cat.products) {
-    if (p.image_url) {
-      thumbs[p.product_id] = (
-        await getImage({ src: p.image_url, width: 320, height: 180 })
-      ).src;
+  for (const sub of cat.subcategories) {
+    for (const p of sub.products) {
+      if (p.image_url) {
+        thumbs[p.product_id] = (
+          await getImage({ src: p.image_url, width: 320, height: 180 })
+        ).src;
+      }
     }
   }
 }
@@ -75,66 +77,217 @@ for (const cat of categories) {
 
 			{
 				categories.length > 1 && (
-					<nav class="sticky top-0 z-20 -mx-4 mb-5 bg-neutral-950/90 px-4 py-3 backdrop-blur">
-						<div class="flex gap-2 overflow-x-auto">
+					<div
+						id="nav"
+						class="sticky top-0 z-20 -mx-4 mb-5 bg-neutral-950/95 backdrop-blur"
+					>
+						{/* Categories: underline tabs, always visible. */}
+						<div class="flex gap-5 overflow-x-auto px-4 pt-3">
 							{categories.map((cat) => (
 								<a
 									href={`#cat-${slug(cat.name)}`}
-									class="shrink-0 rounded-full bg-white/10 px-3.5 py-1.5 text-sm font-medium text-neutral-200 hover:bg-white/20"
+									data-spy="top"
+									class="cat-tab shrink-0 whitespace-nowrap border-b-2 border-transparent pb-2 text-sm font-medium text-neutral-500 transition-colors"
 								>
 									{cat.name}
 								</a>
 							))}
 						</div>
-					</nav>
+						{/* Subcategories: plain text that appears once you scroll; the one
+						    you're scrolled to is auto-selected as an opaque pill, and
+						    tapping one jumps to it. One group per category; the script
+						    shows the active category's. */}
+						<div id="sub-bar" class="hidden border-t border-white/10">
+							{categories.map((cat) => {
+								const brands = cat.subcategories.filter((s) => s.name);
+								return brands.length > 0 ? (
+									<div data-subbar={slug(cat.name)} class="hidden">
+										<div class="flex gap-1.5 overflow-x-auto px-4 py-2">
+											{brands.map((sub) => (
+												<a
+													href={`#cat-${slug(cat.name)}-${slug(sub.name!)}`}
+													data-spy="sub"
+													class="sub-opt shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium text-neutral-500"
+												>
+													{sub.name}
+												</a>
+											))}
+										</div>
+									</div>
+								) : null;
+							})}
+						</div>
+					</div>
 				)
 			}
 
 			{
 				categories.map((cat) => (
 					<section id={`cat-${slug(cat.name)}`} class="mb-8 scroll-mt-24">
-						<h2 class="mb-2 text-lg font-bold">{cat.name}</h2>
-						<div class="divide-y divide-white/10 sm:grid sm:grid-cols-2 sm:gap-3 sm:divide-y-0">
-							{cat.products.map((p) => (
-								<article class="flex gap-3 py-4 sm:rounded-2xl sm:bg-neutral-900 sm:px-3 sm:py-3">
-									<div class="flex min-w-0 flex-1 flex-col items-start">
-										<h3 class="text-sm font-semibold leading-snug">{p.name}</h3>
-										{p.description && (
-											<p class="mt-1 line-clamp-2 text-xs text-neutral-400">
-												{p.description}
-											</p>
-										)}
-										<span class="mt-2 text-sm font-bold">
-											{money(p.price_minor, p.currency)}
-										</span>
-										<div class="mt-2">
-											<CartControl
-												client:visible
-												productId={p.product_id}
-												name={p.name}
-												workerUrl={workerUrl}
-												soldOut={!p.in_stock}
-											/>
-										</div>
-									</div>
-									{p.image_url && (
-										<Image
-											src={p.image_url}
-											alt={p.name}
-											width={320}
-											height={180}
-											loading="lazy"
-											class="h-24 w-24 shrink-0 self-center rounded-xl object-cover"
-										/>
-									)}
-								</article>
-							))}
-						</div>
+						<h2 class="mb-3 text-lg font-bold">{cat.name}</h2>
+						{cat.subcategories.map((sub) => (
+							<div
+								id={sub.name ? `cat-${slug(cat.name)}-${slug(sub.name)}` : undefined}
+								data-subsection={sub.name ? "" : undefined}
+								class="mb-5 scroll-mt-28 last:mb-0"
+							>
+								{sub.name && (
+									<h3 class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+										{sub.name}
+									</h3>
+								)}
+								<div class="divide-y divide-white/10 sm:grid sm:grid-cols-2 sm:gap-3 sm:divide-y-0">
+									{sub.products.map((p) => (
+										<article class="flex gap-3 py-4 sm:rounded-2xl sm:bg-neutral-900 sm:px-3 sm:py-3">
+											<div class="flex min-w-0 flex-1 flex-col items-start">
+												<h4 class="text-sm font-semibold leading-snug">{p.name}</h4>
+												{p.description && (
+													<p class="mt-1 line-clamp-2 text-xs text-neutral-400">
+														{p.description}
+													</p>
+												)}
+												<span class="mt-2 text-sm font-bold">
+													{money(p.price_minor, p.currency)}
+												</span>
+												<div class="mt-2">
+													<CartControl
+														client:visible
+														productId={p.product_id}
+														name={p.name}
+														workerUrl={workerUrl}
+														soldOut={!p.in_stock}
+													/>
+												</div>
+											</div>
+											{p.image_url && (
+												<Image
+													src={p.image_url}
+													alt={p.name}
+													width={320}
+													height={180}
+													loading="lazy"
+													class="h-24 w-24 shrink-0 self-center rounded-xl object-cover"
+												/>
+											)}
+										</article>
+									))}
+								</div>
+							</div>
+						))}
 					</section>
 				))
 			}
 		</div>
 
 		<Cart client:load workerUrl={workerUrl} waNumber={waNumber} images={thumbs} />
+
+		<style>
+			/* Active category: soft-blue underlined tab. */
+			.cat-tab.is-active {
+				color: #7ea6e0;
+				border-bottom-color: #7ea6e0;
+			}
+			/* Selected subcategory: a faint translucent pill among plain-text options. */
+			.sub-opt.is-active {
+				background-color: rgba(126, 166, 224, 0.1);
+				color: #bcd3f2;
+			}
+		</style>
+
+		<script>
+			const nav = document.getElementById("nav");
+			if (nav) {
+				const hrefId = (a: HTMLAnchorElement) =>
+					decodeURIComponent(a.getAttribute("href")!.slice(1));
+				const tabs = Array.from(
+					nav.querySelectorAll<HTMLAnchorElement>('a[data-spy="top"]'),
+				);
+				const subBar = document.getElementById("sub-bar");
+				const subGroups = Array.from(
+					nav.querySelectorAll<HTMLElement>("[data-subbar]"),
+				);
+				const sections = Array.from(
+					document.querySelectorAll<HTMLElement>('section[id^="cat-"]'),
+				);
+
+				// Slide a tab's horizontal bar so the active tab is centred in view.
+				const reveal = (tab: HTMLElement) => {
+					const row = tab.parentElement;
+					if (!row) return;
+					const left =
+						tab.getBoundingClientRect().left -
+						row.getBoundingClientRect().left +
+						row.scrollLeft;
+					row.scrollTo({
+						left: left - row.clientWidth / 2 + tab.clientWidth / 2,
+						behavior: "smooth",
+					});
+				};
+
+				const subPills = Array.from(
+					nav.querySelectorAll<HTMLAnchorElement>('a[data-spy="sub"]'),
+				);
+				const subSections = Array.from(
+					document.querySelectorAll<HTMLElement>("[data-subsection]"),
+				).filter((el) => el.id);
+
+				// The lowest target whose top has scrolled above the marker line — the
+				// category/brand you're currently reading.
+				const lastAbove = (els: HTMLElement[], trigger: number) => {
+					let best: HTMLElement | null = els[0] ?? null;
+					for (const el of els) {
+						if (el.getBoundingClientRect().top - trigger <= 0) best = el;
+					}
+					return best;
+				};
+
+				let curTop: string | null = null;
+				let curSub: string | null = null;
+				const sync = () => {
+					// The subcategory row only appears once you start scrolling.
+					subBar?.classList.toggle("hidden", window.scrollY < 8);
+
+					const top = lastAbove(sections, 110);
+					if (top && top.id !== curTop) {
+						curTop = top.id;
+						const cat = top.id.replace(/^cat-/, "");
+						for (const a of tabs) {
+							const on = hrefId(a) === top.id;
+							a.classList.toggle("is-active", on);
+							if (on) reveal(a);
+						}
+						for (const g of subGroups)
+							g.classList.toggle("hidden", g.dataset.subbar !== cat);
+					}
+
+					// Auto-select the subcategory (brand) you're scrolled to.
+					const sub = lastAbove(subSections, 150);
+					const subId = sub ? sub.id : null;
+					if (subId !== curSub) {
+						curSub = subId;
+						for (const a of subPills) {
+							const on = subId !== null && hrefId(a) === subId;
+							a.classList.toggle("is-active", on);
+							if (on) reveal(a);
+						}
+					}
+				};
+
+				let raf = 0;
+				addEventListener(
+					"scroll",
+					() => {
+						if (!raf)
+							raf = requestAnimationFrame(() => {
+								raf = 0;
+								sync();
+							});
+					},
+					{ passive: true },
+				);
+				addEventListener("resize", sync, { passive: true });
+				sync();
+			}
+		</script>
 	</body>
 </html>

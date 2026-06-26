@@ -16,7 +16,20 @@ export type Product = {
   in_stock: boolean;
 };
 
-export type Category = { name: string; products: Product[] };
+// A category's `category` column may encode a subcategory as "Top > Brand"
+// (e.g. "Cat - Dry Food > Royal Canin"). The storefront renders two levels: a
+// top category, each holding one or more named subcategories. Shops without a
+// " > " (e.g. Bake 'N' Take) collapse to a single unnamed subcategory.
+export type Subcategory = { name: string | null; products: Product[] };
+export type Category = { name: string; subcategories: Subcategory[] };
+
+const SEP = " > ";
+const splitCategory = (category: string): [string, string | null] => {
+  const i = category.indexOf(SEP);
+  return i === -1
+    ? [category, null]
+    : [category.slice(0, i), category.slice(i + SEP.length)];
+};
 
 // The shop's storefront header, read from the shops row at build time. A shop
 // created by catalog ingest has cover_url/tagline null; the page omits them.
@@ -60,12 +73,17 @@ export async function loadCatalog(): Promise<Category[]> {
         ORDER BY category, name`,
   ])) as [unknown, Product[]];
 
-  // Group into categories, preserving the query's category order.
-  const byCategory = new Map<string, Product[]>();
+  // Group into top categories, then subcategories, preserving the query's order
+  // (ORDER BY category, name keeps each "Top > Brand" run contiguous).
+  const byCategory = new Map<string, Map<string, Product[]>>();
   for (const p of products) {
-    const group = byCategory.get(p.category) ?? [];
+    const [top, sub] = splitCategory(p.category);
+    const subs = byCategory.get(top) ?? new Map<string, Product[]>();
+    const key = sub ?? "";
+    const group = subs.get(key) ?? [];
     group.push(p);
-    byCategory.set(p.category, group);
+    subs.set(key, group);
+    byCategory.set(top, subs);
   }
   // Placeholder menu ordering until it's shop-configurable (backend-driven, its
   // own ticket): a curated priority with unknown categories falling to the end
@@ -86,6 +104,12 @@ export async function loadCatalog(): Promise<Category[]> {
     return i === -1 ? ORDER.length : i;
   };
   return [...byCategory]
-    .map(([name, products]) => ({ name, products }))
+    .map(([name, subs]) => ({
+      name,
+      subcategories: [...subs].map(([sub, products]) => ({
+        name: sub || null,
+        products,
+      })),
+    }))
     .sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name));
 }
