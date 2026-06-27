@@ -4,6 +4,7 @@ import { loadCatalog, loadShop } from "../lib/catalog";
 import { money } from "../lib/money";
 import CartControl from "../components/CartControl.tsx";
 import Cart from "../components/Cart.tsx";
+import RecentItems from "../components/RecentItems.tsx";
 import TokenNotice from "../components/TokenNotice.tsx";
 import "../styles/global.css";
 
@@ -74,6 +75,8 @@ for (const cat of categories) {
 
 		<div class="mx-auto max-w-2xl px-4 pb-28">
 			<TokenNotice client:load />
+
+			<RecentItems client:load workerUrl={workerUrl} images={thumbs} />
 
 			{
 				categories.length > 1 && (

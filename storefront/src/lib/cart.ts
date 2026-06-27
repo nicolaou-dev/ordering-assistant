@@ -53,6 +53,32 @@ export async function checkout(workerUrl: string): Promise<void> {
   if (!res.ok) throw new Error(`checkout failed (${res.status})`);
 }
 
+export type RecentItem = {
+  product_id: string;
+  name: string;
+  price_minor: number;
+  currency: string;
+  in_stock: boolean;
+};
+
+// The customer's recently-bought products, for the "Bought before" strip. Needs
+// the cart token (it's their own history); without one there's nothing to show.
+export async function fetchRecentItems(
+  workerUrl: string,
+): Promise<RecentItem[]> {
+  const token = getToken();
+  if (!token) return [];
+  try {
+    const res = await fetch(
+      `${workerUrl}/cart/recent-items?token=${encodeURIComponent(token)}`,
+    );
+    if (!res.ok) return [];
+    return ((await res.json()) as { items: RecentItem[] }).items ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export async function mutate(
   workerUrl: string,
   product_id: string,

@@ -8,7 +8,13 @@ import { mintCartToken, verifyCartToken } from "./cart_token";
 import z from "zod";
 import { createClient } from "./whatsapp/client";
 import { formatProductCaption, type ProductRow } from "./whatsapp/product";
-import { createAdminDb, createDb, withShop, type Sql } from "./db";
+import {
+  createAdminDb,
+  createDb,
+  withShop,
+  withShopCustomer,
+  type Sql,
+} from "./db";
 import type { Reply } from "./reply";
 import { getAgentByName, routeAgentRequest } from "agents";
 import * as XLSX from "xlsx";
@@ -587,6 +593,9 @@ app.post("/debug/reset", async (c) => {
 // identifies which OrderAgent to edit; verify it, derive the agent's name
 // `${shopId}:${customer}`, then call the same addItem/removeItem the model's
 // tools use. Returns the cart (items + total) for the page to render.
+// How many distinct recently-bought products the "Bought before" strip shows.
+const RECENT_ITEMS_LIMIT = 12;
+
 const CartBody = z.object({
   token: z.string(),
   product_id: z.string(),
@@ -695,6 +704,33 @@ app.post("/cart/checkout", async (c) => {
   );
 
   return c.body(null, 204);
+});
+
+// The customer's recently-bought items, for the storefront's "Bought before"
+// strip. Authed by the cart token (not the DO): verify it, then read under RLS
+// scoped to this shop AND customer (loop_agent role), so a token can only ever
+// see its own purchase history. Distinct products, most-recent purchase first,
+// joined to the live catalog so name/price/stock are current and deleted
+// products drop out — the storefront re-adds them with the normal Add control.
+app.get("/cart/recent-items", async (c) => {
+  const settings = getSettings(c.env);
+  const token = c.req.query("token");
+  if (!token) return c.json({ error: "bad request" }, 400);
+
+  const claims = await verifyCartToken(token, settings.WHATSAPP_APP_SECRET);
+  if (!claims) return c.json({ error: "invalid token" }, 401);
+
+  const db = createDb(settings);
+  const [items] = await withShopCustomer(db, claims.shopId, claims.customer, [
+    db`SELECT p.product_id, p.name, p.price_minor, p.currency, p.in_stock
+       FROM order_items i
+       JOIN orders o ON o.order_id = i.order_id
+       JOIN products p ON p.product_id = i.product_id AND p.deleted_at IS NULL
+       GROUP BY p.product_id, p.name, p.price_minor, p.currency, p.in_stock
+       ORDER BY max(o.created_at) DESC
+       LIMIT ${RECENT_ITEMS_LIMIT}`,
+  ]);
+  return c.json({ items });
 });
 
 app.post("/debug/send", async (c) => {
