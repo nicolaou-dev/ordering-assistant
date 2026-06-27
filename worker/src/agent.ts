@@ -146,6 +146,20 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   }
 
   /**
+   * The shop marked this customer's order complete — it's been fulfilled.
+   * Mirror of notifyApproved: a deterministic trigger that has the model tell
+   * the customer their order is done, then run one turn. The marker is context
+   * for the model, never sent verbatim.
+   */
+  @callable()
+  async notifyCompleted(): Promise<Reply[]> {
+    this.recordUserMessage(
+      "[The shop marked the customer's order complete. Let them know it's all done and thank them.]",
+    );
+    return this.runModel();
+  }
+
+  /**
    * The current draft order state. Read by the storefront cart endpoints and the
    * debug/state seam; the order snapshot the model sees is rendered from this
    * same state each turn, so it's the single source of truth for the order.

@@ -425,17 +425,19 @@ app.get("/orders", async (c) => {
   });
 });
 
-// Seller decides one pending order — approve or reject. The Bearer token is the
-// identity: it resolves to the shop_id (never the path). The seller path runs as
-// the admin role with an explicit shop_id filter on every query, so a token for
-// shop A can't touch shop B's order — no row matches, the status read comes back
-// empty, and it reads as 404. The UPDATE is guarded on status so only
-// pending_approval -> approved/rejected happens; any other status is left
-// untouched and reported back (409) so the seller knows it was already handled.
-async function decideOrder(
+// Seller transitions one order — approve/reject a pending order, or complete an
+// approved one. The Bearer token is the identity: it resolves to the shop_id
+// (never the path). The seller path runs as the admin role with an explicit
+// shop_id filter on every query, so a token for shop A can't touch shop B's
+// order — no row matches, the status read comes back empty, and it reads as 404.
+// The UPDATE is guarded on the expected source status so only the intended
+// transition happens; any other status is left untouched and reported back (409)
+// so the seller knows it was already handled.
+async function transitionOrder(
   c: Context<{ Bindings: CloudflareBindings }>,
-  to: "approved" | "rejected",
-  notifyMethod: "notifyApproved" | "notifyRejected",
+  from: "pending_approval" | "approved",
+  to: "approved" | "rejected" | "completed",
+  notifyMethod: "notifyApproved" | "notifyRejected" | "notifyCompleted",
 ): Promise<Response> {
   const settings = getSettings(c.env);
   const shopId = await sellerShopId(c);
@@ -445,18 +447,18 @@ async function decideOrder(
   const [changed, current] = await sql.transaction([
     sql`UPDATE orders SET status = ${to}, updated_at = now()
         WHERE order_id = ${orderId} AND shop_id = ${shopId}
-          AND status = 'pending_approval'
+          AND status = ${from}
         RETURNING order_id, status, customer_phone`,
     sql`SELECT status FROM orders WHERE order_id = ${orderId} AND shop_id = ${shopId}`,
   ]);
 
   if (changed.length > 0) {
-    // The order is decided in the DB now, so the seller's Accept/Reject is done —
+    // The order is updated in the DB now, so the seller's action is done —
     // respond immediately. Let the customer hear it from the agent, not a canned
     // template: signal their OrderAgent to author a turn and push it over
     // WhatsApp. That's a model turn plus a send — best-effort side work that must
     // not make the seller's click hang, so it runs after the response (mirrors
-    // the inbound webhook). A failure leaves the order decided and is just logged.
+    // the inbound webhook). A failure leaves the order updated and is just logged.
     const customer = changed[0].customer_phone as string;
     c.executionCtx.waitUntil(
       (async () => {
@@ -497,10 +499,13 @@ async function decideOrder(
 }
 
 app.post("/orders/:order_id/approve", (c) =>
-  decideOrder(c, "approved", "notifyApproved"),
+  transitionOrder(c, "pending_approval", "approved", "notifyApproved"),
 );
 app.post("/orders/:order_id/reject", (c) =>
-  decideOrder(c, "rejected", "notifyRejected"),
+  transitionOrder(c, "pending_approval", "rejected", "notifyRejected"),
+);
+app.post("/orders/:order_id/complete", (c) =>
+  transitionOrder(c, "approved", "completed", "notifyCompleted"),
 );
 
 app.get("/debug/rls/:shop_id", async (c) => {

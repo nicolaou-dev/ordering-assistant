@@ -206,7 +206,7 @@ function Orders({ shopId }: { shopId: string }) {
   }, [refetch]);
 
   // Live updates: subscribe to this shop's ShopAgent. It bumps a revision on
-  // every order change (new order, accept, reject); each synced state push
+  // every order change (new order, accept, reject, complete); each synced state push
   // triggers a refetch. The JWT rides in as the query token the Worker checks in
   // onBeforeConnect. The socket hibernates while idle.
   useAgent({
@@ -219,7 +219,10 @@ function Orders({ shopId }: { shopId: string }) {
     },
   });
 
-  async function decide(orderId: string, action: "approve" | "reject") {
+  async function decide(
+    orderId: string,
+    action: "approve" | "reject" | "complete",
+  ) {
     setBusy(orderId);
     try {
       await callWorker(`/orders/${orderId}/${action}`, { method: "POST" });
@@ -294,6 +297,15 @@ function Orders({ shopId }: { shopId: string }) {
                   Accept
                 </button>
               </div>
+            )}
+            {o.status === "approved" && (
+              <button
+                disabled={busy === o.order_id}
+                onClick={() => decide(o.order_id, "complete")}
+                className="rounded-md bg-primary px-3 py-1 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              >
+                Complete
+              </button>
             )}
           </div>
         </li>
