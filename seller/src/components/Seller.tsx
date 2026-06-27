@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAgent } from "agents/react";
+import { ChevronsUpDown, LogOut, Settings } from "lucide-react";
 import {
   NeonAuthUIProvider,
   SignedIn,
@@ -7,7 +8,6 @@ import {
   AuthLoading,
   SignInForm,
   SignUpForm,
-  UserButton,
 } from "@neondatabase/auth-ui";
 import { authClient, callWorker, getToken, workerUrl } from "../lib/auth";
 
@@ -69,16 +69,101 @@ function Dashboard() {
   }, []);
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Orders</h1>
-        {/* Default variant is the filled "primary" button — near-white in dark
-            mode. outline blends it into the dark dashboard. */}
-        <UserButton variant="outline" />
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="shrink-0 text-xl font-semibold">Orders</h1>
+        <AccountMenu />
       </div>
       {error && (
         <p className="text-sm text-destructive">Couldn’t reach the shop: {error}</p>
       )}
       {shopId && <Orders shopId={shopId} />}
+    </div>
+  );
+}
+
+// The signed-in user's menu. Neon Auth's UserButton renders a Radix dropdown
+// that doesn't open on iOS (an upstream Radix/WebKit bug, no modal/prop fix), so
+// we use a plain button toggle — native onClick fires reliably on iOS, the same
+// way the sign-in form's button does. Still Neon Auth underneath: useSession for
+// the user, signOut to end the session (which flips back to <SignedOut>).
+function AccountMenu() {
+  const [open, setOpen] = useState(false);
+  const { data } = authClient.useSession();
+  const user = data?.user;
+  if (!user) return null;
+  const initials = (user.name || user.email || "?")
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0]!.toUpperCase())
+    .join("");
+  const avatar = (
+    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+      {initials}
+    </span>
+  );
+  return (
+    <div className="relative min-w-0">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="flex min-w-0 items-center gap-2 rounded-md border border-border px-2 py-1.5 text-sm"
+      >
+        {avatar}
+        <span className="min-w-0 text-left leading-tight">
+          <span className="block truncate font-medium">{user.name}</span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {user.email}
+          </span>
+        </span>
+        <ChevronsUpDown className="ml-1 size-4 shrink-0 text-muted-foreground" />
+      </button>
+      {open && (
+        <>
+          {/* tap-away backdrop */}
+          <button
+            aria-hidden
+            tabIndex={-1}
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-40"
+          />
+          <div
+            role="menu"
+            className="absolute right-0 z-50 mt-1 w-60 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
+          >
+            <div className="flex items-center gap-2 px-2 py-1.5">
+              {avatar}
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{user.name}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {user.email}
+                </p>
+              </div>
+            </div>
+            <div className="my-1 h-px bg-border" />
+            <a
+              role="menuitem"
+              href="/settings"
+              className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent"
+            >
+              <Settings className="size-4 text-muted-foreground" />
+              Settings
+            </a>
+            <button
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                void authClient.signOut();
+              }}
+              className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+            >
+              <LogOut className="size-4 text-muted-foreground" />
+              Sign Out
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
