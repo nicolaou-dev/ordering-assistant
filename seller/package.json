@@ -9,7 +9,11 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
+    "deploy": "astro build && wrangler pages deploy dist --project-name loop-seller --branch main",
     "astro": "astro"
+  },
+  "devDependencies": {
+    "wrangler": "^4.98.0"
   },
   "dependencies": {
     "@astrojs/react": "^6.0.0",
