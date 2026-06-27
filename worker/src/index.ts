@@ -84,6 +84,13 @@ const app = new Hono<{ Bindings: CloudflareBindings }>();
 // the signed token in the body, not a cookie, so an open origin is safe.
 app.use("/cart/*", cors());
 
+// The seller app is its own origin (separate deploy) and authenticates with a
+// Neon Auth Bearer token, not a cookie — so an open origin is safe here too.
+// Covers the seller context (/seller/me), the orders read, and the approve action.
+app.use("/seller/*", cors());
+app.use("/orders", cors());
+app.use("/orders/*", cors());
+
 app.get("/healthz", (c) => {
   return c.json({ ok: true, ts: new Date().toISOString() });
 });
@@ -358,10 +365,10 @@ app.post("/admin/shops", async (c) => {
   return c.json(shop);
 });
 
-// Exercise the seller auth: echoes back the shop_id the caller's Neon Auth token
-// resolves to (via shop_owners), or 401/403. Lets us verify the auth path before
-// the dashboard exists.
-app.get("/debug/seller", async (c) => {
+// The signed-in seller's context: the shop their Neon Auth token resolves to
+// (via shop_owners), or 401/403. The dashboard calls this on load to confirm the
+// session and learn which shop it's operating as.
+app.get("/seller/me", async (c) => {
   const shopId = await sellerShopId(c);
   return c.json({ shop_id: shopId });
 });

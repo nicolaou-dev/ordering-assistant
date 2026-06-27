@@ -4,6 +4,7 @@
   "scripts": {
     "typecheck": "pnpm -r --if-present typecheck",
     "worker": "pnpm --filter worker",
-    "storefront": "pnpm --filter storefront"
+    "storefront": "pnpm --filter storefront",
+    "seller": "pnpm --filter seller"
   }
 }

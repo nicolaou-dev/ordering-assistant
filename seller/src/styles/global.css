@@ -1,0 +1,4 @@
+@import "tailwindcss";
+/* Neon Auth UI theme tokens (Tailwind v4 build — tokens only, ~2KB). Provides
+   the --primary/--muted/etc. variables the auth components and our buttons use. */
+@import "@neondatabase/auth-ui/tailwind";
