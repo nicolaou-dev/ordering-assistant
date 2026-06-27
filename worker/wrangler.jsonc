@@ -20,11 +20,13 @@
 	],
   "durable_objects": {
     "bindings": [
-      { "name": "OrderAgent", "class_name": "OrderAgent" }
+      { "name": "OrderAgent", "class_name": "OrderAgent" },
+      { "name": "ShopAgent", "class_name": "ShopAgent" }
     ]
   },
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["OrderAgent"] }
+    { "tag": "v1", "new_sqlite_classes": ["OrderAgent"] },
+    { "tag": "v2", "new_sqlite_classes": ["ShopAgent"] }
   ]
 	/**
 	 * Smart Placement

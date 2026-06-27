@@ -3,6 +3,7 @@ import { generateText, Output, stepCountIs, type ModelMessage } from "ai";
 import { Reply } from "./reply";
 import { Agent, callable } from "agents";
 import { getSettings } from "./settings";
+import { notifyShop } from "./shop_agent";
 import { createDb, withShop, withShopCustomer } from "./db";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import {
@@ -126,6 +127,20 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   async notifyApproved(): Promise<Reply[]> {
     this.recordUserMessage(
       "[The shop approved the customer's order. Let them know it's confirmed and being prepared.]",
+    );
+    return this.runModel();
+  }
+
+  /**
+   * The shop rejected this customer's submitted order. Mirror of notifyApproved:
+   * a deterministic trigger that has the model tell the customer their order
+   * wasn't accepted, then run one turn. The marker is context for the model,
+   * never sent verbatim.
+   */
+  @callable()
+  async notifyRejected(): Promise<Reply[]> {
+    this.recordUserMessage(
+      "[The shop couldn't accept the customer's order. Let them know it wasn't placed, apologise briefly, and offer to help with anything else.]",
     );
     return this.runModel();
   }
@@ -390,6 +405,9 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     }
 
     this.setState(emptyOrder);
+    // A new pending order landed — nudge the shop's open dashboards to refetch.
+    // Best-effort and after the commit, so a push failure never undoes the order.
+    await notifyShop(this.env, this.shopId);
     return { order_id: orderId, total_minor: total, currency };
   }
 

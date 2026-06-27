@@ -10,11 +10,12 @@ import { createClient } from "./whatsapp/client";
 import { formatProductCaption, type ProductRow } from "./whatsapp/product";
 import { createAdminDb, createDb, withShop, type Sql } from "./db";
 import type { Reply } from "./reply";
-import { getAgentByName } from "agents";
+import { getAgentByName, routeAgentRequest } from "agents";
 import * as XLSX from "xlsx";
 import { verifyNeonAuthToken } from "./neon_auth";
+import { ShopAgent, notifyShop } from "./shop_agent";
 
-export { OrderAgent };
+export { OrderAgent, ShopAgent };
 
 // Deliver the agent's replies to one customer over WhatsApp. Shared by the
 // inbound webhook and the storefront checkout endpoint so both render replies
@@ -236,17 +237,27 @@ async function productId(shopId: string, category: string, name: string) {
 // shop they own. Throws 401 on a missing/invalid token, 403 when the user owns
 // no shop. The seller order endpoints derive shop_id from this — never from the
 // path or ADMIN_TOKEN. (First slice assumes a single shop per owner.)
+// Validate a Neon Auth bearer token down to its user id, or null when missing or
+// invalid. Shared by the seller HTTP endpoints and the dashboard WebSocket auth.
+// Neon Auth signs tokens with iss = the deployment origin (no /neondb/auth
+// path), so validate against the base URL's origin.
+async function userIdForToken(
+  token: string | undefined,
+  settings: ReturnType<typeof getSettings>,
+): Promise<string | null> {
+  if (!token) return null;
+  const issuer = new URL(settings.NEON_AUTH_BASE_URL).origin;
+  return verifyNeonAuthToken(token, settings.NEON_AUTH_JWKS_URL, issuer);
+}
+
 async function sellerShopId(
   c: Context<{ Bindings: CloudflareBindings }>,
 ): Promise<string> {
   const settings = getSettings(c.env);
-  const token = c.req.header("Authorization")?.slice(7);
-  // Neon Auth signs tokens with iss = the deployment origin (no /neondb/auth
-  // path), so validate against the base URL's origin.
-  const issuer = new URL(settings.NEON_AUTH_BASE_URL).origin;
-  const userId = token
-    ? await verifyNeonAuthToken(token, settings.NEON_AUTH_JWKS_URL, issuer)
-    : null;
+  const userId = await userIdForToken(
+    c.req.header("Authorization")?.slice(7),
+    settings,
+  );
   if (!userId) throw new HTTPException(401, { message: "invalid auth token" });
 
   const sql = createAdminDb(settings);
@@ -389,11 +400,13 @@ app.get("/orders", async (c) => {
 
   const [orders, items] = await sql.transaction([
     status
-      ? sql`SELECT order_id, status, customer_phone, fulfillment_type,
+      ? sql`SELECT order_id, status, customer_phone, customer_name, fulfillment_type,
+                   address_line1, address_line2, address_city, address_postcode, address_notes,
                    total_minor, currency, created_at
             FROM orders WHERE shop_id = ${shopId} AND status = ${status}
             ORDER BY created_at DESC`
-      : sql`SELECT order_id, status, customer_phone, fulfillment_type,
+      : sql`SELECT order_id, status, customer_phone, customer_name, fulfillment_type,
+                   address_line1, address_line2, address_city, address_postcode, address_notes,
                    total_minor, currency, created_at
             FROM orders WHERE shop_id = ${shopId} ORDER BY created_at DESC`,
     sql`SELECT order_id, qty, name, unit_price_minor, line_total_minor
@@ -412,36 +425,40 @@ app.get("/orders", async (c) => {
   });
 });
 
-// Seller approves one pending order. The Bearer token is the identity: it
-// resolves to the shop_id (never the path). The seller path runs as the admin
-// role with an explicit shop_id filter on every query, so a token for shop A
-// can't touch shop B's order — no row matches, the status read comes back empty,
-// and it reads as 404. The UPDATE is guarded on status so only pending_approval
-// -> approved happens; any other status is left untouched and reported back
-// (409) so the seller knows it was already handled.
-app.post("/orders/:order_id/approve", async (c) => {
+// Seller decides one pending order — approve or reject. The Bearer token is the
+// identity: it resolves to the shop_id (never the path). The seller path runs as
+// the admin role with an explicit shop_id filter on every query, so a token for
+// shop A can't touch shop B's order — no row matches, the status read comes back
+// empty, and it reads as 404. The UPDATE is guarded on status so only
+// pending_approval -> approved/rejected happens; any other status is left
+// untouched and reported back (409) so the seller knows it was already handled.
+async function decideOrder(
+  c: Context<{ Bindings: CloudflareBindings }>,
+  to: "approved" | "rejected",
+  notifyMethod: "notifyApproved" | "notifyRejected",
+): Promise<Response> {
   const settings = getSettings(c.env);
   const shopId = await sellerShopId(c);
   const orderId = c.req.param("order_id");
   const sql = createAdminDb(settings);
 
-  const [approved, current] = await sql.transaction([
-    sql`UPDATE orders SET status = 'approved', updated_at = now()
+  const [changed, current] = await sql.transaction([
+    sql`UPDATE orders SET status = ${to}, updated_at = now()
         WHERE order_id = ${orderId} AND shop_id = ${shopId}
           AND status = 'pending_approval'
         RETURNING order_id, status, customer_phone`,
     sql`SELECT status FROM orders WHERE order_id = ${orderId} AND shop_id = ${shopId}`,
   ]);
 
-  if (approved.length > 0) {
+  if (changed.length > 0) {
     // Let the customer hear it from the agent, not a canned template: signal
     // their OrderAgent (keyed by shop + customer phone) to author a turn, then
     // push the replies over WhatsApp. The send is best-effort — the order is
-    // already approved, so a failed notification must not fail the seller's
+    // already decided, so a failed notification must not fail the seller's
     // request — but we await it so the seller's 200 reflects a sent message.
-    const customer = approved[0].customer_phone as string;
+    const customer = changed[0].customer_phone as string;
     const stub = await getAgentByName(c.env.OrderAgent, `${shopId}:${customer}`);
-    const replies = await stub.notifyApproved();
+    const replies = await stub[notifyMethod]();
     await sendReplies(replies, {
       client: createClient(settings),
       to: customer,
@@ -452,7 +469,9 @@ app.post("/orders/:order_id/approve", async (c) => {
       menuLink: async () =>
         `${settings.STOREFRONT_URL}/?t=${await mintCartToken(shopId, customer, settings.WHATSAPP_APP_SECRET)}`,
     });
-    return c.json({ order_id: orderId, status: "approved" });
+    // Push the status change to any open seller dashboards for this shop.
+    await notifyShop(c.env, shopId);
+    return c.json({ order_id: orderId, status: to });
   }
   // No transition: either the order isn't visible to this shop (RLS → no row →
   // 404) or it's in some other status (409 with that status, unchanged).
@@ -460,7 +479,14 @@ app.post("/orders/:order_id/approve", async (c) => {
     return c.json({ error: "order not found" }, 404);
   }
   return c.json({ order_id: orderId, status: current[0].status }, 409);
-});
+}
+
+app.post("/orders/:order_id/approve", (c) =>
+  decideOrder(c, "approved", "notifyApproved"),
+);
+app.post("/orders/:order_id/reject", (c) =>
+  decideOrder(c, "rejected", "notifyRejected"),
+);
 
 app.get("/debug/rls/:shop_id", async (c) => {
   const settings = getSettings(c.env);
@@ -648,4 +674,37 @@ app.post("/debug/send", async (c) => {
   }
 });
 
-export default app;
+// The seller dashboard opens a WebSocket to its shop's ShopAgent for live order
+// pushes. Route /agents/* through the Agents SDK; everything else is the Hono
+// app. The socket is authorized in onBeforeConnect: the browser can't set WS
+// headers, so the Neon Auth JWT rides in as ?token=, and a seller may only
+// connect to the ShopAgent named for a shop they own (lobby.name). cors:true
+// lets the seller app (its own origin) connect.
+export default {
+  async fetch(
+    request: Request,
+    env: CloudflareBindings,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
+    const agentResponse = await routeAgentRequest(request, env, {
+      cors: true,
+      onBeforeConnect: async (req, lobby) => {
+        if (lobby.className !== "ShopAgent") {
+          return new Response("Not found", { status: 404 });
+        }
+        const settings = getSettings(env);
+        const token =
+          new URL(req.url).searchParams.get("token") ?? undefined;
+        const userId = await userIdForToken(token, settings);
+        if (!userId) return new Response("Unauthorized", { status: 401 });
+        const sql = createAdminDb(settings);
+        const [row] = await sql`SELECT 1 FROM shop_owners
+          WHERE user_id = ${userId} AND shop_id = ${lobby.name} LIMIT 1`;
+        if (!row) return new Response("Forbidden", { status: 403 });
+        // void → allow the connection.
+      },
+    });
+    if (agentResponse) return agentResponse;
+    return app.fetch(request, env, ctx);
+  },
+};
