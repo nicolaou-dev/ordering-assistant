@@ -120,27 +120,30 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
    * deterministic trigger rather than a typed message: drop an internal marker
    * so the model tells the customer their order was approved, then run one turn.
    * The submitted order lives in Neon (the DO draft was cleared at submit), so
-   * the model speaks from the conversation history, not the draft state. The
-   * marker is context for the model, never sent to the customer.
+   * the model speaks from the conversation history, not the draft state. One
+   * agent handles all of a customer's orders, so the seller passes a short
+   * summary of the order acted on (items + total) — that's how the model knows
+   * which order to name when the customer has more than one. The marker is
+   * context for the model, never sent to the customer.
    */
   @callable()
-  async notifyApproved(): Promise<Reply[]> {
+  async notifyApproved(order: string): Promise<Reply[]> {
     this.recordUserMessage(
-      "[The shop approved the customer's order. Let them know it's confirmed and being prepared.]",
+      `[The shop approved the customer's order (${order}). Let them know it's confirmed and being prepared.]`,
     );
     return this.runModel();
   }
 
   /**
    * The shop rejected this customer's submitted order. Mirror of notifyApproved:
-   * a deterministic trigger that has the model tell the customer their order
-   * wasn't accepted, then run one turn. The marker is context for the model,
-   * never sent verbatim.
+   * a deterministic trigger that has the model tell the customer the order named
+   * by `order` (items + total) wasn't accepted, then run one turn. The marker is
+   * context for the model, never sent verbatim.
    */
   @callable()
-  async notifyRejected(): Promise<Reply[]> {
+  async notifyRejected(order: string): Promise<Reply[]> {
     this.recordUserMessage(
-      "[The shop couldn't accept the customer's order. Let them know it wasn't placed, apologise briefly, and offer to help with anything else.]",
+      `[The shop couldn't accept the customer's order (${order}). Let them know it wasn't placed, apologise briefly, and offer to help with anything else.]`,
     );
     return this.runModel();
   }
@@ -148,13 +151,15 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   /**
    * The shop marked this customer's order complete — it's been fulfilled.
    * Mirror of notifyApproved: a deterministic trigger that has the model tell
-   * the customer their order is done, then run one turn. The marker is context
-   * for the model, never sent verbatim.
+   * the customer the order named by `order` (items + total) is done, then run
+   * one turn. Completion is terminal, so the message itself spells out the order
+   * details as a final record. The marker is context for the model, never sent
+   * verbatim.
    */
   @callable()
-  async notifyCompleted(): Promise<Reply[]> {
+  async notifyCompleted(order: string): Promise<Reply[]> {
     this.recordUserMessage(
-      "[The shop marked the customer's order complete. Let them know it's all done and thank them.]",
+      `[The shop marked the customer's order complete — it's done. Let them know, and include the order details in your message as a final record: ${order}. Thank them.]`,
     );
     return this.runModel();
   }

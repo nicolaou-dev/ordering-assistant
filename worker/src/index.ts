@@ -444,11 +444,16 @@ async function transitionOrder(
   const orderId = c.req.param("order_id");
   const sql = createAdminDb(settings);
 
-  const [changed, current] = await sql.transaction([
+  const [changed, items, current] = await sql.transaction([
     sql`UPDATE orders SET status = ${to}, updated_at = now()
         WHERE order_id = ${orderId} AND shop_id = ${shopId}
           AND status = ${from}
-        RETURNING order_id, status, customer_phone`,
+        RETURNING order_id, status, customer_phone, total_minor, currency, fulfillment_type`,
+    // Items for the notification summary, scoped through the parent order so a
+    // token for another shop can't read them (order_items has no shop_id).
+    sql`SELECT qty, name FROM order_items
+        WHERE order_id = ${orderId}
+          AND order_id IN (SELECT order_id FROM orders WHERE shop_id = ${shopId})`,
     sql`SELECT status FROM orders WHERE order_id = ${orderId} AND shop_id = ${shopId}`,
   ]);
 
@@ -460,6 +465,12 @@ async function transitionOrder(
     // not make the seller's click hang, so it runs after the response (mirrors
     // the inbound webhook). A failure leaves the order updated and is just logged.
     const customer = changed[0].customer_phone as string;
+    // A short, human identifier for the order the seller acted on — the model
+    // needs it to name the right order when this customer has more than one.
+    const total = (Number(changed[0].total_minor) / 100).toFixed(2);
+    const summary = `${items
+      .map((i) => `${i.qty}x ${i.name}`)
+      .join(", ")} — total ${total} ${changed[0].currency} — ${changed[0].fulfillment_type}`;
     c.executionCtx.waitUntil(
       (async () => {
         try {
@@ -467,7 +478,7 @@ async function transitionOrder(
             c.env.OrderAgent,
             `${shopId}:${customer}`,
           );
-          const replies = await stub[notifyMethod]();
+          const replies = await stub[notifyMethod](summary);
           await sendReplies(replies, {
             client: createClient(settings),
             to: customer,
