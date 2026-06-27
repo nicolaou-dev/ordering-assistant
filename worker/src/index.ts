@@ -451,25 +451,40 @@ async function decideOrder(
   ]);
 
   if (changed.length > 0) {
-    // Let the customer hear it from the agent, not a canned template: signal
-    // their OrderAgent (keyed by shop + customer phone) to author a turn, then
-    // push the replies over WhatsApp. The send is best-effort — the order is
-    // already decided, so a failed notification must not fail the seller's
-    // request — but we await it so the seller's 200 reflects a sent message.
+    // The order is decided in the DB now, so the seller's Accept/Reject is done —
+    // respond immediately. Let the customer hear it from the agent, not a canned
+    // template: signal their OrderAgent to author a turn and push it over
+    // WhatsApp. That's a model turn plus a send — best-effort side work that must
+    // not make the seller's click hang, so it runs after the response (mirrors
+    // the inbound webhook). A failure leaves the order decided and is just logged.
     const customer = changed[0].customer_phone as string;
-    const stub = await getAgentByName(c.env.OrderAgent, `${shopId}:${customer}`);
-    const replies = await stub[notifyMethod]();
-    await sendReplies(replies, {
-      client: createClient(settings),
-      to: customer,
-      // loop_agent (RLS): sendReplies hydrates product_list cards from the
-      // catalog scoped to this shop. Only the order UPDATE/read above needs admin.
-      sql: createDb(settings),
-      shopId,
-      menuLink: async () =>
-        `${settings.STOREFRONT_URL}/?t=${await mintCartToken(shopId, customer, settings.WHATSAPP_APP_SECRET)}`,
-    });
-    // Push the status change to any open seller dashboards for this shop.
+    c.executionCtx.waitUntil(
+      (async () => {
+        try {
+          const stub = await getAgentByName(
+            c.env.OrderAgent,
+            `${shopId}:${customer}`,
+          );
+          const replies = await stub[notifyMethod]();
+          await sendReplies(replies, {
+            client: createClient(settings),
+            to: customer,
+            // loop_agent (RLS): sendReplies hydrates product_list cards from the
+            // catalog scoped to this shop. Only the order UPDATE above needs admin.
+            sql: createDb(settings),
+            shopId,
+            menuLink: async () =>
+              `${settings.STOREFRONT_URL}/?t=${await mintCartToken(shopId, customer, settings.WHATSAPP_APP_SECRET)}`,
+          });
+        } catch (e) {
+          console.error("order decision notify failed", {
+            orderId,
+            error: (e as Error).message,
+          });
+        }
+      })(),
+    );
+    // Push the status change to any other open seller dashboards for this shop.
     await notifyShop(c.env, shopId);
     return c.json({ order_id: orderId, status: to });
   }
@@ -641,22 +656,27 @@ app.post("/cart/checkout", async (c) => {
     `${claims.shopId}:${claims.customer}`,
   );
 
-  let replies;
-  try {
-    replies = await stub.checkout();
-  } catch (e) {
-    console.error("checkout turn failed", { error: (e as Error).message });
-    return c.json({ error: "checkout failed" }, 502);
-  }
-
-  await sendReplies(replies, {
-    client: createClient(settings),
-    to: claims.customer,
-    sql: createDb(settings),
-    shopId: claims.shopId,
-    menuLink: async () =>
-      `${settings.STOREFRONT_URL}/?t=${await mintCartToken(claims.shopId, claims.customer, settings.WHATSAPP_APP_SECRET)}`,
-  });
+  // The tap is acknowledged immediately; the agent's confirmation turn and its
+  // WhatsApp send run after the response. Checkout kicks off a model turn — the
+  // storefront shouldn't spin on it before handing the customer to WhatsApp.
+  // Best-effort, mirroring the inbound webhook; a failure is just logged.
+  c.executionCtx.waitUntil(
+    (async () => {
+      try {
+        const replies = await stub.checkout();
+        await sendReplies(replies, {
+          client: createClient(settings),
+          to: claims.customer,
+          sql: createDb(settings),
+          shopId: claims.shopId,
+          menuLink: async () =>
+            `${settings.STOREFRONT_URL}/?t=${await mintCartToken(claims.shopId, claims.customer, settings.WHATSAPP_APP_SECRET)}`,
+        });
+      } catch (e) {
+        console.error("checkout turn failed", { error: (e as Error).message });
+      }
+    })(),
+  );
 
   return c.body(null, 204);
 });
