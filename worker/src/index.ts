@@ -191,7 +191,7 @@ app.post("/webhook/whatsapp", async (c) => {
     });
 
     const stub = await getAgentByName(c.env.OrderAgent, sessionKey);
-    const replies = await stub.runTurn(text.body);
+    const { replies } = await stub.runTurn(text.body);
 
     await sendReplies(replies, {
       client,
@@ -544,8 +544,8 @@ app.post("/debug/chat", async (c) => {
     instance: string;
   }>();
   const stub = await getAgentByName(c.env.OrderAgent, instance);
-  const replies = await stub.runTurn(message);
-  return c.json({ replies });
+  const { replies, providerMetadata } = await stub.runTurn(message);
+  return c.json({ replies, providerMetadata });
 });
 
 // Debug seam for the storefront Checkout tap, mirroring /cart/checkout's

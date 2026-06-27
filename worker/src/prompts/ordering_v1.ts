@@ -7,9 +7,10 @@ export type ShopContext = {
 // flow, the reply types, and a few canonical examples. Holds no per-turn data, so it stays byte-identical
 // across turns and shops and caches as the prompt prefix. The catalog schema and
 // SQL guidance live on the query_data tool (colocated with the tool that needs
-// them). The per-shop block (stable for the conversation) and the live order
-// snapshot (changes each turn) are appended after it by system(), most-stable
-// first, so the volatile snapshot never sits mid-prompt and breaks the cache.
+// them). The per-shop block (stable for the conversation) is appended after it by
+// system(). The live order snapshot (changes each turn) is NOT in the system
+// prompt — the agent injects it as a trailing message after the conversation, so
+// the whole system prompt and the conversation history stay cacheable.
 const STATIC = `<role>
 You're a friendly employee of this shop, taking a customer's order over WhatsApp.
 Your goal is to take the customer's order. Write the way you'd text a customer.
@@ -39,7 +40,7 @@ nothing coming.
 </turn>
 
 <flow>
-You fill one order — the current order is shown at the end of this prompt (## Current order).
+You fill one order — the current order is shown as ## Current order, after the conversation.
 
 Fill in all fields of the order.
 
@@ -102,16 +103,14 @@ Call the query_data tool before replying. Replying ends the turn.
 `;
 
 /**
- * Build the system prompt for a turn. Ordered most-stable to most-volatile so
- * the prefix stays cache-friendly: static rules/schema, then the per-shop block
- * (stable for the conversation), then the live order snapshot (changes each
- * turn). The shop block is omitted when nothing has been ingested yet.
+ * Build the system prompt for a turn. Fully stable for the conversation —
+ * static rules/schema, then the per-shop block. No per-turn or changing data, so
+ * the agent caches the whole thing as the prompt prefix; the volatile blocks (the
+ * customer's last order, whose status changes, and the live order snapshot) are
+ * injected separately after the conversation. The shop block is omitted when
+ * nothing has been ingested yet.
  */
-export function system(
-  { shopName, categories }: ShopContext,
-  lastOrder: string,
-  orderSnapshot: string,
-): string {
+export function system({ shopName, categories }: ShopContext): string {
   const sorted = [...categories].sort((a, b) =>
     a.category.localeCompare(b.category),
   );
@@ -121,11 +120,6 @@ export function system(
     categories.length === 0
       ? ""
       : `\n\n## This shop\n\n${name}Categories (item counts):\n${list}`;
-  // The last order (per-customer, stable for the conversation) sits after the
-  // per-shop block and before the volatile draft snapshot, so the cache-friendly
-  // ordering holds: static rules, then shop, then customer history, then the
-  // order that changes each turn. Empty string for a first-timer.
-  const lastOrderBlock = lastOrder ? `\n\n${lastOrder}` : "";
 
-  return `${STATIC}${shopBlock}${lastOrderBlock}\n\n${orderSnapshot}`;
+  return `${STATIC}${shopBlock}`;
 }

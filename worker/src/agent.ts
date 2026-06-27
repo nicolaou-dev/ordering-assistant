@@ -94,7 +94,10 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
   }
 
   @callable()
-  async runTurn(prompt: string): Promise<Reply[]> {
+  async runTurn(prompt: string): Promise<{
+    replies: Reply[];
+    providerMetadata?: Record<string, unknown>;
+  }> {
     this.recordUserMessage(prompt);
     return this.runModel();
   }
@@ -112,7 +115,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     this.recordUserMessage(
       "[The customer tapped Checkout in the storefront. Their items are in the current order below (## Current order) — read it as the order so far. They've finished adding, so take it from there toward placing the order.]",
     );
-    return this.runModel();
+    return (await this.runModel()).replies;
   }
 
   /**
@@ -131,7 +134,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     this.recordUserMessage(
       `[The shop approved the customer's order (${order}). Let them know it's confirmed and being prepared.]`,
     );
-    return this.runModel();
+    return (await this.runModel()).replies;
   }
 
   /**
@@ -145,7 +148,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     this.recordUserMessage(
       `[The shop couldn't accept the customer's order (${order}). Let them know it wasn't placed, apologise briefly, and offer to help with anything else.]`,
     );
-    return this.runModel();
+    return (await this.runModel()).replies;
   }
 
   /**
@@ -161,7 +164,7 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     this.recordUserMessage(
       `[The shop marked the customer's order complete — it's done. Let them know, and include the order details in your message as a final record: ${order}. Thank them.]`,
     );
-    return this.runModel();
+    return (await this.runModel()).replies;
   }
 
   /**
@@ -430,7 +433,10 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
     return { order_id: orderId, total_minor: total, currency };
   }
 
-  private async runModel(): Promise<Reply[]> {
+  private async runModel(): Promise<{
+    replies: Reply[];
+    providerMetadata?: Record<string, unknown>;
+  }> {
     const output = Output.array({ element: Reply });
     const settings = getSettings(this.env);
     const db = createDb(settings);
@@ -543,18 +549,54 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       SELECT role, content FROM messages
       WHERE draft_id IN (${prevId}, ${draftId}) ORDER BY id`;
 
-    const messages = rows.map((r) => ({
+    const history = rows.map((r) => ({
       role: r.role,
       content: JSON.parse(r.content),
     })) as ModelMessage[];
 
-    const { output: replies, response } = await generateText({
+    // An ephemeral cache breakpoint (5m TTL). Anthropic caches the request
+    // prefix up to and including the block it sits on; the prefix must be
+    // byte-identical to a prior request to hit.
+    const cache = {
+      anthropic: { cacheControl: { type: "ephemeral" as const } },
+    };
+    // Floating breakpoint on the last message we've seen: this turn writes the
+    // cache up to here, next turn reads it (the prefix is then stable) — so the
+    // growing conversation is billed in full only once.
+    if (history.length > 0) {
+      history[history.length - 1] = {
+        ...history[history.length - 1],
+        providerOptions: cache,
+      };
+    }
+
+    // The changing context goes after both breakpoints so it never enters a
+    // cached prefix: the live order snapshot (changes every turn) and the
+    // customer's last order (its status changes as the shop acts on it). Both
+    // re-rendered from state each turn and not persisted (not in response.messages).
+    const tail = [renderLastOrder(lastOrder), renderOrderSnapshot(this.state)]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const messages: ModelMessage[] = [
+      // Stable head, sent as a system message (not the `system` param) so the
+      // cache breakpoint can hang off it. Caches the tools block too — tools sit
+      // ahead of it in the request, inside this prefix.
+      {
+        role: "system",
+        content: system({ shopName, categories }),
+        providerOptions: cache,
+      },
+      ...history,
+      { role: "user", content: tail },
+    ];
+
+    const {
+      output: replies,
+      response,
+      providerMetadata,
+    } = await generateText({
       model,
-      system: system(
-        { shopName, categories },
-        renderLastOrder(lastOrder),
-        renderOrderSnapshot(this.state),
-      ),
       messages,
       output,
       tools: {
@@ -577,6 +619,9 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
         .sql`INSERT INTO messages (role, content, draft_id) VALUES (${message.role}, ${JSON.stringify(message.content)}, ${draftId})`;
     }
 
-    return replies;
+    return {
+      replies,
+      providerMetadata: providerMetadata as Record<string, unknown> | undefined,
+    };
   }
 }
