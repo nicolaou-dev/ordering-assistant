@@ -2,13 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import { useAgent } from "agents/react";
 import { ChevronsUpDown, LogOut, Settings } from "lucide-react";
 import {
-  NeonAuthUIProvider,
   SignedIn,
   SignedOut,
   AuthLoading,
   SignInForm,
   SignUpForm,
 } from "@neondatabase/auth-ui";
+import { AuthProvider } from "./AuthProvider";
 import { authClient, callWorker, getToken, workerUrl } from "../lib/auth";
 
 // The seller-facing app. Signed out → Neon Auth sign-in; signed in → the orders
@@ -16,10 +16,7 @@ import { authClient, callWorker, getToken, workerUrl } from "../lib/auth";
 // service, and the live order feed is a WebSocket to the shop's ShopAgent.
 export default function Seller() {
   return (
-    <NeonAuthUIProvider
-      authClient={authClient}
-      credentials={{ passwordValidation: { minLength: 8, maxLength: 128 } }}
-    >
+    <AuthProvider>
       <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-6 px-3 py-6 sm:px-6">
         <AuthLoading>
           <p className="text-center text-sm text-muted-foreground">Loading…</p>
@@ -33,7 +30,7 @@ export default function Seller() {
           <Dashboard />
         </SignedIn>
       </main>
-    </NeonAuthUIProvider>
+    </AuthProvider>
   );
 }
 
