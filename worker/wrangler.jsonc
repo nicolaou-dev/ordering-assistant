@@ -27,6 +27,9 @@
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["OrderAgent"] },
     { "tag": "v2", "new_sqlite_classes": ["ShopAgent"] }
+  ],
+  "r2_buckets": [
+    { "binding": "SHOP_IMAGES", "bucket_name": "loop-shop-images" }
   ]
 	/**
 	 * Smart Placement
