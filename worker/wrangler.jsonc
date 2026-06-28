@@ -29,7 +29,9 @@
     { "tag": "v2", "new_sqlite_classes": ["ShopAgent"] }
   ],
   "r2_buckets": [
-    { "binding": "SHOP_IMAGES", "bucket_name": "loop-shop-images" }
+    // remote:true so `wrangler dev` reads/writes the real bucket — images must
+    // live where the public r2.dev URL serves them, not in local-only storage.
+    { "binding": "SHOP_IMAGES", "bucket_name": "loop-shop-images", "remote": true }
   ]
 	/**
 	 * Smart Placement

@@ -390,6 +390,46 @@ app.get("/seller/me", async (c) => {
   return c.json({ shop_id: shopId });
 });
 
+// The image types we accept, mapped to the extension used in the R2 key.
+const IMAGE_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+// Seller uploads one product/cover image. Worker-proxied (not a presigned S3
+// PUT): images are small, so streaming the bytes through here lets us auth via
+// the seller's token, content-hash the key for free dedupe, and avoid managing
+// S3 credentials. The body is the raw image; its content-type picks the
+// extension. The key is <shopId>/<sha256>.<ext> — the caller stores that key (or
+// the URL we return), and the public URL is R2_PUBLIC_BASE_URL + key, so swapping
+// r2.dev for a custom domain later is a config change, not a data migration.
+// Under /seller/* so it inherits the seller CORS and namespace (list/delete to
+// follow).
+app.post("/seller/media", async (c) => {
+  const shopId = await sellerShopId(c);
+  const contentType = c.req.header("content-type") ?? "";
+  const ext = IMAGE_EXT[contentType];
+  if (!ext) return c.json({ error: "unsupported image type" }, 415);
+
+  const buf = await c.req.arrayBuffer();
+  if (buf.byteLength === 0) return c.json({ error: "empty body" }, 400);
+  if (buf.byteLength > MAX_IMAGE_BYTES)
+    return c.json({ error: "image too large" }, 413);
+
+  const digest = await crypto.subtle.digest("SHA-256", buf);
+  const sha = [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  const key = `${shopId}/${sha}.${ext}`;
+
+  await c.env.SHOP_IMAGES.put(key, buf, { httpMetadata: { contentType } });
+
+  const { R2_PUBLIC_BASE_URL } = getSettings(c.env);
+  return c.json({ key, url: `${R2_PUBLIC_BASE_URL}/${key}` });
+});
+
 // Seller reads their shop's orders, newest first — the read side the approve
 // flow acts on, until a dashboard exists. The caller's Neon Auth token resolves
 // to their shop (sellerShopId). This is the seller path — deterministic SQL we

@@ -1,0 +1,16 @@
+---
+import Media from "../components/Media.tsx";
+import "../styles/global.css";
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Media · Seller</title>
+	</head>
+	<body>
+		{/* client:only — auth state lives in the browser, nothing to prerender */}
+		<Media client:only="react" />
+	</body>
+</html>
