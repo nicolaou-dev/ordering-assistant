@@ -7,7 +7,9 @@ import "@uppy/core/css/style.min.css";
 import "@uppy/dashboard/css/style.min.css";
 import { AuthProvider } from "./AuthProvider";
 import { AppHeader } from "./AppHeader";
-import { getToken, workerUrl } from "../lib/auth";
+import { callWorker, getToken, workerUrl } from "../lib/auth";
+
+type Image = { key: string; url: string; uploaded_at: string };
 
 // The Media page (/media) — a top-level peer of Orders. Behind sign-in; a
 // signed-out visitor is bounced to the dashboard (which shows the sign-in form).
@@ -44,11 +46,12 @@ function RedirectHome() {
 // Uppy gives the upload UX (drag-drop, the native picker — which is the camera
 // on mobile — progress, previews, type/size limits) for free. It POSTs each
 // image straight to the Worker (XHRUpload, raw body so the Worker content-hashes
-// it), authed with the seller's Neon Auth token. On success we show the image
-// served back from its R2 URL, proving the round-trip. Browsing every stored
-// image (the grid) and delete are the next tickets.
+// it), authed with the seller's Neon Auth token. Below the uploader we render
+// the shop's whole gallery, loaded from GET /seller/media; a freshly uploaded
+// image is prepended so it shows without a round-trip. Delete is the next ticket.
 function Uploader() {
-  const [uploaded, setUploaded] = useState<string[]>([]);
+  // The shop's gallery, newest first. Loaded on mount; an upload prepends.
+  const [images, setImages] = useState<Image[]>([]);
   // XHRUpload's headers callback is synchronous, but the Neon Auth token is
   // async — so keep the latest token in a ref and read it when each request is
   // built. Refreshed on mount and whenever a file is added, well before the user
@@ -82,8 +85,11 @@ function Uploader() {
     void refresh();
     const onAdded = () => void refresh();
     const onSuccess = (_file: unknown, response: { body?: unknown }) => {
-      const url = (response.body as { url?: string } | undefined)?.url;
-      if (url) setUploaded((prev) => (prev.includes(url) ? prev : [url, ...prev]));
+      const img = response.body as Image | undefined;
+      if (img?.key)
+        setImages((prev) =>
+          prev.some((p) => p.key === img.key) ? prev : [img, ...prev],
+        );
     };
     uppy.on("file-added", onAdded);
     uppy.on("upload-success", onSuccess);
@@ -93,6 +99,19 @@ function Uploader() {
       uppy.off("upload-success", onSuccess);
     };
   }, [uppy]);
+
+  // Load the existing gallery once the seller lands on the tab.
+  useEffect(() => {
+    let active = true;
+    void callWorker("/seller/media")
+      .then((r) => (r.ok ? r.json() : { images: [] }))
+      .then((d: { images: Image[] }) => {
+        if (active) setImages(d.images);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="flex flex-col gap-4">
@@ -104,12 +123,12 @@ function Uploader() {
         proudlyDisplayPoweredByUppy={false}
         theme="auto"
       />
-      {uploaded.length > 0 && (
+      {images.length > 0 && (
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {uploaded.map((url) => (
+          {images.map((img) => (
             <img
-              key={url}
-              src={url}
+              key={img.key}
+              src={img.url}
               alt=""
               className="aspect-square w-full rounded-md border border-border object-cover"
             />

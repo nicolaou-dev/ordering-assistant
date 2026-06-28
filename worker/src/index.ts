@@ -405,7 +405,7 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 // extension. The key is <shopId>/<sha256>.<ext> — the caller stores that key (or
 // the URL we return), and the public URL is R2_PUBLIC_BASE_URL + key, so swapping
 // r2.dev for a custom domain later is a config change, not a data migration.
-// Under /seller/* so it inherits the seller CORS and namespace (list/delete to
+// Under /seller/* so it inherits the seller CORS and namespace (delete to
 // follow).
 app.post("/seller/media", async (c) => {
   const shopId = await sellerShopId(c);
@@ -428,6 +428,27 @@ app.post("/seller/media", async (c) => {
 
   const { R2_PUBLIC_BASE_URL } = getSettings(c.env);
   return c.json({ key, url: `${R2_PUBLIC_BASE_URL}/${key}` });
+});
+
+// Seller lists their shop's images for the Media grid (and, later, the picker).
+// Keys are prefixed with <shopId>/, so listing that prefix is the shop scope —
+// a seller can only ever see their own objects. R2 returns objects ordered by
+// key (a content hash, so effectively random); we sort by upload time so the
+// grid shows newest first, matching where the uploader prepends.
+app.get("/seller/media", async (c) => {
+  const shopId = await sellerShopId(c);
+  const { R2_PUBLIC_BASE_URL } = getSettings(c.env);
+
+  const listed = await c.env.SHOP_IMAGES.list({ prefix: `${shopId}/` });
+  const images = listed.objects
+    .sort((a, b) => b.uploaded.getTime() - a.uploaded.getTime())
+    .map((o) => ({
+      key: o.key,
+      url: `${R2_PUBLIC_BASE_URL}/${o.key}`,
+      uploaded_at: o.uploaded.toISOString(),
+    }));
+
+  return c.json({ images });
 });
 
 // Seller reads their shop's orders, newest first — the read side the approve
