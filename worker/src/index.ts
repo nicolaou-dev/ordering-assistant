@@ -183,7 +183,7 @@ app.post("/webhook/whatsapp", async (c) => {
     // Only typed messages drive a turn; ignore anything else.
     if (!text?.body) return;
 
-    const client = createClient(settings);
+    const client = createClient(settings, phone_number_id);
 
     // Await so the read receipt + typing indicator are actually sent before the
     // slow agent turn — and not cancelled when a fast turn lets handleInbound
@@ -486,7 +486,7 @@ async function transitionOrder(
           );
           const replies = await stub[notifyMethod](summary);
           await sendReplies(replies, {
-            client: createClient(settings),
+            client: createClient(settings, shopId),
             to: customer,
             // loop_agent (RLS): sendReplies hydrates product_list cards from the
             // catalog scoped to this shop. Only the order UPDATE above needs admin.
@@ -690,7 +690,7 @@ app.post("/cart/checkout", async (c) => {
       try {
         const replies = await stub.checkout();
         await sendReplies(replies, {
-          client: createClient(settings),
+          client: createClient(settings, claims.shopId),
           to: claims.customer,
           sql: createDb(settings),
           shopId: claims.shopId,
@@ -734,9 +734,16 @@ app.get("/cart/recent-items", async (c) => {
 });
 
 app.post("/debug/send", async (c) => {
-  const { to, body } = await c.req.json<{ to: string; body: string }>();
+  const { to, body, phone_number_id } = await c.req.json<{
+    to: string;
+    body: string;
+    phone_number_id?: string;
+  }>();
+  if (!phone_number_id) {
+    return c.json({ error: "phone_number_id required" }, 400);
+  }
   const settings = getSettings(c.env);
-  const client = createClient(settings);
+  const client = createClient(settings, phone_number_id);
 
   try {
     await client.send(to, body);

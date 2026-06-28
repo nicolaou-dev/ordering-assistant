@@ -1,10 +1,16 @@
 import { Settings } from "../settings";
 import { toWhatsApp } from "./markdown";
 
-export const createClient = (settings: Settings) => {
+// `phoneNumberId` is the sender: the shop's own WhatsApp phone_number_id (its
+// shop_id), so a reply goes out from the number the message arrived on. The
+// caller passes it from the conversation it's handling — the webhook's inbound
+// metadata, an order's shop_id — never a global. The access token stays global:
+// one app owns all the numbers today, and a Tech Provider's per-shop token is a
+// later change (see 01KV3H2ZKC11SWVP0SRZPYBJ3K).
+export const createClient = (settings: Settings, phoneNumberId: string) => {
   return {
     send: async (to: string, body: string) => {
-      const url = `https://graph.facebook.com/${settings.WHATSAPP_API_VERSION}/${settings.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+      const url = `https://graph.facebook.com/${settings.WHATSAPP_API_VERSION}/${phoneNumberId}/messages`;
       const result = await fetch(url, {
         method: "POST",
         headers: {
@@ -26,7 +32,7 @@ export const createClient = (settings: Settings) => {
       }
     },
     sendImage: async (to: string, imageUrl: string, caption: string) => {
-      const url = `https://graph.facebook.com/${settings.WHATSAPP_API_VERSION}/${settings.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+      const url = `https://graph.facebook.com/${settings.WHATSAPP_API_VERSION}/${phoneNumberId}/messages`;
       const result = await fetch(url, {
         method: "POST",
         headers: {
@@ -59,7 +65,7 @@ export const createClient = (settings: Settings) => {
       buttonText: string,
       url: string,
     ) => {
-      const apiUrl = `https://graph.facebook.com/${settings.WHATSAPP_API_VERSION}/${settings.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+      const apiUrl = `https://graph.facebook.com/${settings.WHATSAPP_API_VERSION}/${phoneNumberId}/messages`;
       const result = await fetch(apiUrl, {
         method: "POST",
         headers: {
@@ -90,7 +96,7 @@ export const createClient = (settings: Settings) => {
       }
     },
     markReadTyping: async (messageId: string) => {
-      const url = `https://graph.facebook.com/${settings.WHATSAPP_API_VERSION}/${settings.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+      const url = `https://graph.facebook.com/${settings.WHATSAPP_API_VERSION}/${phoneNumberId}/messages`;
       const result = await fetch(url, {
         method: "POST",
         headers: {
