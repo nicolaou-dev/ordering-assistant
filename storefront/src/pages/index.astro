@@ -363,6 +363,7 @@ const searchIndex = categories.flatMap((cat) =>
 
 		<script>
 			import Fuse from "fuse.js";
+			import posthog from "../lib/posthog.js";
 
 			type Entry = { i: string; n: string; d: string; c: string; p: number; cur: string; img: string | null };
 
@@ -424,6 +425,9 @@ const searchIndex = categories.flatMap((cat) =>
 				if (!q) return;
 
 				const hits = fuse.search(q, { limit: 50 });
+				if (hits.length > 0) {
+					posthog.capture("search_performed", { query: q, results_count: hits.length });
+				}
 				if (hits.length === 0) {
 					const msg = document.createElement("p");
 					msg.className = "py-10 text-center text-sm text-neutral-500";
@@ -480,6 +484,7 @@ const searchIndex = categories.flatMap((cat) =>
 		</script>
 		<script>
 			import { $cart, $pending, mutate, qtyOf, getToken } from "../lib/cart";
+			import posthog from "../lib/posthog.js";
 
 			type Entry = { i: string; n: string; d: string; c: string; p: number; cur: string; img: string | null; src: string | null; stock: boolean };
 
@@ -563,6 +568,14 @@ const searchIndex = categories.flatMap((cat) =>
 				const item = byId.get(id);
 				if (!item) return;
 				current = item;
+
+				posthog.capture("product_detail_viewed", {
+					product_id: id,
+					product_name: item.n,
+					category: item.c,
+					price_minor: item.p,
+					currency: item.cur,
+				});
 
 				catEl.textContent = item.c;
 				nameEl.textContent = item.n;

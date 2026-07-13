@@ -1,4 +1,5 @@
 import { atom } from "nanostores";
+import posthog from "./posthog.js";
 
 export type CartItem = {
   product_id: string;
@@ -87,6 +88,7 @@ export async function mutate(
   const token = getToken();
   if (!token) return;
 
+  const prevItem = $cart.get().items.find((i) => i.product_id === product_id);
   $pending.set(new Set($pending.get()).add(product_id));
   $error.set(null);
   try {
@@ -96,7 +98,16 @@ export async function mutate(
       body: JSON.stringify({ token, product_id, qty: 1 }),
     });
     if (!res.ok) throw new Error(`cart ${op} failed (${res.status})`);
-    $cart.set((await res.json()) as Cart);
+    const newCart = (await res.json()) as Cart;
+    $cart.set(newCart);
+    const newItem = newCart.items.find((i) => i.product_id === product_id);
+    const productName = newItem?.name ?? prevItem?.name ?? product_id;
+    const currency = newItem?.currency ?? prevItem?.currency;
+    const priceMinor = newItem?.unit_price_minor ?? prevItem?.unit_price_minor;
+    posthog.capture(
+      op === "add" ? "product_added_to_cart" : "product_removed_from_cart",
+      { product_id, product_name: productName, currency, price_minor: priceMinor },
+    );
   } catch (e) {
     $error.set(e instanceof Error ? e.message : "Something went wrong");
   } finally {

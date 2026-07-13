@@ -11,6 +11,7 @@ import {
   type CartItem,
 } from "../lib/cart";
 import { money } from "../lib/money";
+import posthog from "../lib/posthog.js";
 
 export default function Cart({
   workerUrl,
@@ -43,6 +44,10 @@ export default function Cart({
   async function onCheckout() {
     setCheckingOut(true);
     $error.set(null);
+    posthog.capture("checkout_started", {
+      item_count: count,
+      total_minor: cart.total_minor,
+    });
     try {
       await checkout(workerUrl);
       window.location.href = `https://wa.me/${waNumber}`;
@@ -105,7 +110,13 @@ export default function Cart({
           </button>
         ) : (
           <button
-            onClick={() => setOpen(true)}
+            onClick={() => {
+              setOpen(true);
+              posthog.capture("cart_viewed", {
+                item_count: count,
+                total_minor: cart.total_minor,
+              });
+            }}
             aria-label={`View order, ${count} item${count === 1 ? "" : "s"}`}
             className="flex w-full items-center gap-2 rounded-xl bg-brand px-4 py-3.5 text-white shadow-lg"
           >

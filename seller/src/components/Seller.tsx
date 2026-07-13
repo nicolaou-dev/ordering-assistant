@@ -10,6 +10,7 @@ import {
 import { AuthProvider } from "./AuthProvider";
 import { AppHeader } from "./AppHeader";
 import { callWorker, getToken, workerUrl } from "../lib/auth";
+import posthog from "../lib/posthog.js";
 
 // The seller-facing app. Signed out → Neon Auth sign-in; signed in → the orders
 // queue. Client-only: auth runs in the browser against the managed Neon Auth
@@ -57,11 +58,15 @@ function Dashboard() {
   const [error, setError] = useState("");
   useEffect(() => {
     callWorker("/seller/me")
-      .then(async (res) =>
-        res.ok
-          ? setShopId((await res.json()).shop_id)
-          : setError(`${res.status} ${await res.text()}`),
-      )
+      .then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          setShopId(data.shop_id);
+          posthog.identify(data.shop_id);
+        } else {
+          setError(`${res.status} ${await res.text()}`);
+        }
+      })
       .catch((e) => setError(e instanceof Error ? e.message : "request failed"));
   }, []);
   return (
@@ -136,6 +141,13 @@ function Orders({ shopId }: { shopId: string }) {
     setBusy(orderId);
     try {
       await callWorker(`/orders/${orderId}/${action}`, { method: "POST" });
+      const eventName =
+        action === "approve"
+          ? "order_approved"
+          : action === "reject"
+            ? "order_rejected"
+            : "order_completed";
+      posthog.capture(eventName, { order_id: orderId });
       await refetch();
     } finally {
       setBusy(null);
