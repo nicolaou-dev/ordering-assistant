@@ -20,6 +20,12 @@ const Schema = z.object({
   // Auth JWT against the JWKS, treating BASE_URL as the issuer. Non-secret.
   NEON_AUTH_BASE_URL: z.string().min(1),
   NEON_AUTH_JWKS_URL: z.string().min(1),
+  // PostHog LLM analytics (agent.ts). Optional: the agent traces only when both
+  // are present, so a missing value disables tracing rather than failing the
+  // turn. Same project token as the storefront/seller client key.
+  POSTHOG_KEY: z.string().optional(),
+  POSTHOG_HOST: z.string().optional(),
+  ENVIRONMENT: z.string().optional(),
 });
 
 export type Settings = z.infer<typeof Schema>;

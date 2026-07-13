@@ -6,6 +6,8 @@ import { getSettings } from "./settings";
 import { notifyShop } from "./shop_agent";
 import { createDb, withShop, withShopCustomer } from "./db";
 import { createAnthropic } from "@ai-sdk/anthropic";
+import { PostHog } from "posthog-node";
+import { withTracing } from "@posthog/ai/vercel";
 import {
   addItem as addItemToOrder,
   removeItem as removeItemFromOrder,
@@ -517,9 +519,27 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       this.setState({ ...this.state, customerName: lastOrder.customer_name });
     }
 
-    const model = createAnthropic({ apiKey: settings.ANTHROPIC_API_KEY })(
+    const baseModel = createAnthropic({ apiKey: settings.ANTHROPIC_API_KEY })(
       "claude-haiku-4-5",
     );
+    // Trace the turn to PostHog LLM analytics — deployed worker only, and only
+    // when the PostHog config is present. posthog-node runs on its workerd build
+    // over fetch; posthogCaptureImmediate sends the generation inline, and
+    // posthog.shutdown() below flushes before the Durable Object yields.
+    const posthog =
+      settings.ENVIRONMENT === "production" &&
+      settings.POSTHOG_KEY &&
+      settings.POSTHOG_HOST
+        ? new PostHog(settings.POSTHOG_KEY, { host: settings.POSTHOG_HOST })
+        : null;
+    const model = posthog
+      ? withTracing(baseModel, posthog, {
+          posthogDistinctId: this.customer,
+          posthogProperties: { shop_id: this.shopId },
+          posthogTraceId: this.state.draftId ?? undefined,
+          posthogCaptureImmediate: true,
+        })
+      : baseModel;
 
     // The current draft's id, set by the entry point before this runs. Captured
     // once: submit_order may clear it mid-turn, but this turn's user message and
@@ -618,6 +638,8 @@ export class OrderAgent extends Agent<CloudflareBindings, OrderState> {
       this
         .sql`INSERT INTO messages (role, content, draft_id) VALUES (${message.role}, ${JSON.stringify(message.content)}, ${draftId})`;
     }
+
+    if (posthog) await posthog.shutdown();
 
     return {
       replies,

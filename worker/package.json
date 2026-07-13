@@ -17,11 +17,13 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.81",
     "@neondatabase/serverless": "^1.1.0",
+    "@posthog/ai": "^8.3.0",
     "agents": "^0.15.0",
     "ai": "^6.0.197",
     "hono": "^4.12.24",
     "jose": "^6.2.3",
     "pgsql-ast-parser": "^12.0.2",
+    "posthog-node": "^5.41.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.4.3"
   },
